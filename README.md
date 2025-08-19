@@ -1,93 +1,52 @@
 # Waffle
 
+[![C++](https://img.shields.io/badge/C++-%2300599C.svg?logo=c%2B%2B&logoColor=white)](https://cplusplus.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-red.svg)](https://opensource.org/licenses/MIT)
 
+* [PRESENTATION](#presentation)
+    - [Wave equation](#wave-equation)
+    - [Transmission eigenvalue distribution](#transmission-eigenvalue-distribution)
+    - [Profile of transmission eigenchannels](#profile-of-transmission-eigenchannels)
+    - [Acknowledgements](#acknowledgements)
+* [USAGE AND OPTIONS](#usage-and-options)
+* [INTERNAL IMPLEMENTATION](#internal-implementation)
 
-## Getting started
+## PRESENTATION
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+Waffle is a C++ 2017 program to solve the stationary wave equation in a two-dimensional disordered medium of arbitrary shape.
+The name is an contraction of *"Wave Field from Finite Elements"*.
+This program primarily focuses on the computation of the transmission and reflection matrices between two or more leads, the distribution of transmission eigenvalues, and the profile of transmission eigenchannels (aka transmission eigenstates).
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+### Stationary wave equation
 
-## Add your files
+The stationary wave equation reads:
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+<p>$$ ( \nabla^2 + k^2 - U(\mathbr{r}) ) \psi(\mathbf{r}) = 0 $$</p>
 
-```
-cd existing_repo
-git remote add origin http://gitlab.institut-langevin.espci.fr/metheo/codes/matrix-approach/waffle.git
-git branch -M main
-git push -uf origin main
-```
+where $\psi(\mathbf{r})$ is the wavefunction, $k$ is the wavenumber, and $U(\mathbf{r})$ is the random potential whose fluctuations are related to the scattering [mean free path](https://en.wikipedia.org/wiki/Mean_free_path) $\ell_{\mathrm{s}}$.
+However, it should be noted that the program actually solves a discretized variant of the wave equation defined on a square lattice of step $h$:
 
-## Integrate with your tools
+<p>$$ ( \mathsf{L} + (kh)^2 - \mathsf{u} ) \mathbf{\psi} = 0 $$</p>
 
-- [ ] [Set up project integrations](http://gitlab.institut-langevin.espci.fr/metheo/codes/matrix-approach/waffle/-/settings/integrations)
+In this equation, the matrix $\mathsf{L}$ represents the five-point Laplacian, defined by elements $-4$ along the diagonal and $+1$ with the four nearest neighbors (4-neighborhood), $(kh)^2$ is implicitly multiplied by the identity matrix, $\mathsf{u}$ is a diagonal matrix containing the values of $U(\mathbf{r})h^2$ on all grid points, and $\mathbf{\psi}$ is a column vector containing the values of the wavefunction on the grid points.
+It is important to note that the dispersion relation of this discretized wave equation is *not* isotropic. It reads
 
-## Collaborate with your team
+<p>$$ 4\sin^2(k_xh/2) + 4\sin^2(k_yh/2) = (kh)^2 $$</p>
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+and reduces to the standard isotropic dispersion $k_x^2+k_y^2=k^2$ only in the limit $h\rightarrow 0$ (for $k$ fixed).
+In order to avoid forbidden directions of propagation, the wavenumber must be limited to $kh\leq 2$.
+A reasonable compromise between mitigating anisotropy and reducing the number of grid points is $kh=1$, which corresponds to about 6 points per wavelength.
+With this choice, the dispersion curve deviates by less than $2.5\%$ from a perfect circle.
 
-## Test and Deploy
+<span style="color:red">TODO: Write a few words on open boundary conditions, and stress that they are exact...</span>
 
-Use the built-in continuous integration in GitLab.
+### Acknowledgements
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+This program was developed by David Gaspard ([Institut Langevin](https://ror.org/00kr24y60), [ESPCI Paris](https://ror.org/03zx86w41), [PSL University](https://ror.org/013cjyk83), [CNRS](https://ror.org/02feahw73)) mainly in August 2025.
+This research has been supported by the [ANR](https://ror.org/00rbzpz17) project MARS_light under reference [ANR-19-CE30-0026](https://anr.fr/Project-ANR-19-CE30-0026), by the program "Investissements d'Avenir" launched by the French Government.
+It also received support from a grant of the [Simons Foundation](https://ror.org/01cmst727) (No. 1027116).
 
-***
+## USAGE AND OPTIONS
 
-# Editing this README
+<span style="color:red">TODO: Write a few words on the commands...................................</span>
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
