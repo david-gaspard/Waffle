@@ -1,0 +1,17 @@
+## Created on 2025-07-23 at 18:16:54 CEST by David Gaspard (ORCID 0000-0002-4449-8782) <david.gaspard@espci.fr> under the MIT License.
+## Ignore directories ##
+bin/
+out/
+old/
+plot/__pycache__/
+
+## Ignore binary files ##
+waffle
+*.test
+*.pdf
+*.png
+*.jpg
+*.tiff
+*.gif
+*.dig
+
