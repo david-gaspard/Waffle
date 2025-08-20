@@ -107,3 +107,35 @@ std::string to_string_prec(const double value, const int prec) {
     ss << value;
     return ss.str();
 }
+
+/**
+ * Computes the elliptic K integral, K(m), where "m" is the elliptic modulus such that m < 1.
+ * In contrast to the standard implementation of elliptic K in the C++ library, this version allows negative 
+ * elliptic moduli (m<0).
+ * This implementation uses the powerful arithmetic-geometric average method which allows for arbitrary arguments,
+ * even complex values of "m" if necessary.
+ */
+double ellipticK(const double m) {
+    if (m > 1.) {// Elliptic moduli larger than 1 are forbidden because then K(m) is complex.
+        throw std::invalid_argument("In ellipticK(): Elliptic moduli must be smaller than 1.");
+    }
+    
+    // First compute the arithmetic-geometric mean of (1, sqrt(1-m)):
+    const int maxit = 10;  // Safety limit on the number of iterations (should never be reached, in practice niter=5).
+    double a = 1.;
+    double gn, g = std::sqrt(1. - m);
+    //std::cout.precision(16);
+    
+    for (int iter = 1; iter <= maxit; iter++) {// Do several iterations (convergence is extremely fast, niter=5).
+        gn = std::sqrt(a*g);
+        a = (a + g)/2.;
+        g = gn;
+        //std::cout << TAG_INFO << "#" << iter << "\t| a=" << a << ", g=" << g << ", (a-g)=" << (a-g) << "\n";
+        if (std::abs(a-g) < 1e-15*a) {// Stopping criterion.
+            break;
+        }
+    }
+    
+    return PI/(2.*a);
+}
+

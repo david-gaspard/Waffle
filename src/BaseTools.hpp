@@ -17,5 +17,6 @@ void uniqueFilename(const std::string& path, const std::string& suffix, std::str
 void printProgressBar(const int64_t cjob, const int64_t njob, const std::string& msg, const std::chrono::steady_clock::time_point& start);
 double endProgressBar(const std::chrono::steady_clock::time_point& start);
 std::string to_string_prec(const double value, const int prec);
+double ellipticK(const double m);
 
 #endif

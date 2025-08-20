@@ -14,7 +14,7 @@
 ## PRESENTATION
 
 Waffle is a C++ 2017 program to solve the stationary wave equation in a two-dimensional disordered medium of arbitrary shape.
-The name is an contraction of *"Wave Field from Finite Elements"*.
+The name is an contraction of *"Wave Field From Finite Elements"*.
 This program primarily focuses on the computation of the transmission and reflection matrices between two or more leads, the distribution of transmission eigenvalues, and the profile of transmission eigenchannels (aka transmission eigenstates).
 
 ### Stationary wave equation

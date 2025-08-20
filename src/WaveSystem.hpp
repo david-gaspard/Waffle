@@ -27,6 +27,7 @@ class WaveSystem {
     int noutputprop;   // Number of propagating modes in the output lead(s).
     double dosinput;   // Density of states in the input lead(s).
     double dosoutput;  // Density of states in the input lead(s).
+    double dosfree;    // Free density of states on a square lattice. Exact value based on the elliptic integral K(k).
     
     double kh;         // Wavenumber times the lattice step, 2*pi*h/lambda. Also the phase accumulated across a lattice step (in radian).
     double holscat;    // Lattice step divided by the scattering mean free path, h/lscat. Total length is not a well defined unit.

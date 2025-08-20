@@ -169,7 +169,8 @@ void WaveSystem::printInfo() const {
     std::cout << TAG_INFO << "WaveSystem with sysname='" << sysname << "', Npoint=" << npoint << ", kh=" << kh
         << ", h/lscat=" << holscat << ", h/labso=" << holabso << "\n" 
         << TAG_INFO << "Ninputprop/Ninput=" << ninputprop << "/" << ninput << ", Noutputprop/Noutput=" << noutputprop << "/" << noutput
-        << ", DOSinput=" << dosinput << ", DOSoutput=" << dosoutput << ", Hamiltonian_spmat_density=" << 100.*hamiltonian.density() << "%\n";
+        << ", DOSinput=" << dosinput << ", DOSoutput=" << dosoutput << ", DOSfree=" << dosfree 
+        << ", Hamiltonian_spmat_density=" << 100.*hamiltonian.density() << "%\n";
 }
 
 /**
@@ -263,7 +264,8 @@ void WaveSystem::plotIntensity(const RealMatrix& intensity, const std::string de
     ofs << "%% Parameters: sysname='" << sysname << "', dataname='" << dataname << "', Npoint=" << npoint
         << ", kh=" << kh << ", h/lscat=" << holscat << ", h/labso=" << holabso 
         << "\n%% Ninputprop/Ninput=" << ninputprop << "/" << ninput << ", Noutputprop/Noutput=" << noutputprop << "/" << noutput 
-        << ", DOSinput=" << dosinput << ", DOSoutput=" << dosoutput << ", Hamiltonian_spmat_density=" << 100.*hamiltonian.density() << "%"
+        << ", DOSinput=" << dosinput << ", DOSoutput=" << dosoutput << ", DOSfree=" << dosfree 
+        << ", Hamiltonian_spmat_density=" << 100.*hamiltonian.density() << "%"
         << "\n%% Info: " << description << "\n"
         << "x" << sep << "y" << sep << "north" << sep << "south" << sep << "east" << sep << "west";
     
@@ -420,22 +422,7 @@ void WaveSystem::setDisorder(const uint64_t seed) {
     dcomplex kh2 = dcomplex(kh*kh, MEPS);
     
     // Standard deviation of the random potential uh2 = U(x, y) * h^2 approximately producing the scattering strength h/lscat : 
-    const double sigma = std::sqrt(kh*holscat/(PI*FREEDOS));  
-    
-    /**
-     * [ h^2*d_x^2 + kh^2 - U(x)*h^2 ] psi(x) = 0.
-     * 
-     * P[U] = exp(-1/(2*alpha) * U^2 * h^2) ,  we let uh2 = U*h^2.
-     * 
-     * P[U] = exp(-1/(2*alpha*h^2) * uh2^2) .
-     * 
-     * sigma^2 = alpha*h^2 , we know that alpha = k/(pi*nu*lscat) , with nu = S_d k^(d-2) / 2 (2*pi)^d = 1/(4*pi).
-     * 
-     * sigma^2 = h^2 * k/(pi*nu*lscat) .
-     * 
-     * sigma^2 = kh/(pi*nu) * h/lscat .
-     * 
-     */
+    const double sigma = std::sqrt(kh*holscat/(PI*dosfree));  
     
     std::mt19937_64 rng;  // Instantiate the standard Mersenne Twister random number generator (64-bit-return version).
     rng.seed(seed);       // Initialize the random generator with the given seed.
@@ -518,6 +505,10 @@ void WaveSystem::computeIOStates() {
     // Normalize the density of states:
     dosinput  /= 2*PI*ninput;
     dosoutput /= 2*PI*noutput;
+    
+    // Compute the exact free density of states on a square lattice:
+    const double khm4 = 4. - kh*kh;
+    dosfree = (2./(PI*PI*khm4)) * ellipticK( kh*kh*(kh*kh - 8.)/(khm4*khm4) );
 }
 
 /**
