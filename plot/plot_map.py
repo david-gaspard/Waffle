@@ -58,7 +58,7 @@ SUNSET_CMAP = SUNSET_CMAP.reversed() ## Reverse the colormap in order to get lar
                                      ## Note: Black on white is much more suitable for printing (since it reduces ink bleeding) and more efficient for reading (as reported by many studies) but, unfortunately, when it represents physical quantities it is less easy to interpret because white is generally associated with higher intensities.
 SUNSET_CMAP.set_bad('white', 0.) ## Set the color when nan is encountered. Args: (color, opacity).
 
-def colormap_to_tikz_code(cmap, nsample):
+def colormap_to_tikz_code(cmap, nsample, mode):
     """
     Returns a TikZ code version of the given colormap "cmap" using a given number of samples "nsample".
     Example output: 'colormap={temperature}{rgb255=(0,0,128) rgb255=(0,0,255) rgb255=(255,255,255) rgb255=(255,0,0) rgb255=(128,0,0)}'
@@ -72,7 +72,12 @@ def colormap_to_tikz_code(cmap, nsample):
         rgb255 = [int(np.round(255*c)) for c in cmap(val)[0:3]]
         string += "rgb255=(" + str(rgb255[0]) + ","+ str(rgb255[1]) +","+ str(rgb255[2]) +") "
     
-    return string + "}"
+    string += "}"
+    
+    if (mode == "log"):
+        string += ", colorbar style={yticklabel={$10^{\\pgfmathprintnumber[fixed relative, precision=3]{\\tick}}$}}"
+    
+    return string
 
 def find_value_in_header(key, fp):
     """
@@ -104,13 +109,14 @@ def plot_map(args):
     The data in the field file are assumed to have the form [x, y, north, south, east, west, f1, f2, ..., fn], where the components 'x' and 'y' are assumed to be integers, and the cardinal directions are the indices of nearest neighbors or boundary conditions.
     """
     ## Check if the number of arguments is correct:
-    if (len(args) != 3):
+    if (len(args) != 4):
         print(compile_tikz.TAG_ERROR + "Invalid number of arguments, doing nothing...")
-        print(compile_tikz.TAG_USAGE + args[0] + " COLUMN_NAME FIELD_FILE")
+        print(compile_tikz.TAG_USAGE + args[0] + " MODE(lin|log) COLUMN_NAME FIELD_FILE")
         return 1
     
-    column_name = args[1]  ## Interpret arg #1 as the name of the column in the field file.
-    field_file  = args[2]  ## Interpret arg #2 as the name of the field file.
+    mode = args[1]  ## Coloring mode ("lin" or "log").
+    column_name = args[2]  ## Interpret arg #1 as the name of the column in the field file.
+    field_file  = args[3]  ## Interpret arg #2 as the name of the field file.
     file_path = os.path.splitext(field_file)[0]  ## The file path is the filename without its extension (used to write new files). 
     
     try:
@@ -139,26 +145,20 @@ def plot_map(args):
         ##print(compile_tikz.TAG_INFO + "matrix[", i, ",", j, "] = ", float(p[column_name]))
     
     matrix = np.ma.array(matrix, mask=np.isnan(matrix))  ## Use a mask to escape nan values.
-    ##print(matrix)
+    if (mode == "log"):
+        matrix = np.log10(matrix)
     
-    cmap = SUNSET_CMAP  ## Use custom 'sunset' colormap.
+    #cmap = SUNSET_CMAP  ## Use custom 'sunset' colormap.
+    cmap = mplt.cm.turbo ## Use 'turbo' colormap.
     #cmap = mplt.cm.jet ## Use 'jet' colormap.
     #mplt.imshow(matrix, cmap=cmap)  ## Show the plot in live (optional).
     #mplt.colorbar()
     #mplt.show()
     
     ## Find the bounds (vmin, vmax) of the charted function:
-    if (column_name in ["I_a", "I_b", "C_ab"]):
-        vmin_actual = matrix.min()
-        if (vmin_actual > 0):
-            vmin = 0  ## For positive definite quantities, the minimum value should be zero.
-        else:
-            vmin = vmin_actual
-            print(compile_tikz.TAG_WARN + "Minimum value of intensity '" + column_name + "' is negative (" + str(vmin_actual) + "). This means that the solution failed to converge.")
-    else:
-        vmin = matrix.min() ## Extract the depth range of the field [vmin, vmax].
+    vmin = matrix.min() ## Extract the depth range of the field [vmin, vmax].
     vmax = matrix.max()
-    norm = mplt.Normalize(vmin=vmin, vmax=vmax)
+    norm = mcol.Normalize(vmin=vmin, vmax=vmax)
     image = cmap(norm(matrix)) ## Create the bitmap image.
     ##print(compile_tikz.TAG_INFO + "vmin = ", vmin, ", vmax = ", vmax)
     
@@ -173,7 +173,7 @@ def plot_map(args):
 \\begin{{tikzpicture}}[%
     /pgfplots/every axis/.append style={{%
         width=0.9\\textwidth,
-        {colorbar_string},
+        {colorbar_string}
     }},
     {boundary_style},
 ]%
@@ -197,10 +197,10 @@ def plot_map(args):
         my_program = args[0],
         my_copyright = compile_tikz.MY_COPYRIGHT,
         title  = "\\detokenize{" + field_file + "}\\\\ \\detokenize{"+ column_name + "}",
-        xlabel = "$x/\\lscat$",
-        ylabel = "$y/\\lscat$",
+        xlabel = "$x/\\ell$",
+        ylabel = "$y/\\ell$",
         holscat = holscat,
-        colorbar_string = colormap_to_tikz_code(cmap, 41),
+        colorbar_string = colormap_to_tikz_code(cmap, 41, mode),
         boundary_style = plot_mesh.BOUNDARY_STYLE,
         boundary_code = plot_mesh.boundary_to_tikz_code(data),
         vmin   = vmin,

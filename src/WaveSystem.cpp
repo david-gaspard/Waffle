@@ -34,7 +34,7 @@ WaveSystem::WaveSystem(const std::string& sysname, const SquareMesh& mesh, const
         outputKlh(noutput, 1),
         green(npoint, ninput)
     {
-    //std::cout << TAG_INFO << "Creating WaveSystem...\n";
+    std::cout << TAG_INFO << "Creating WaveSystem, building Hamiltonian...\n";
     setWavenumber(kh);
     setScattering(holscat);
     setAbsorption(holabso);
@@ -170,7 +170,7 @@ void WaveSystem::printInfo() const {
         << ", h/lscat=" << holscat << ", h/labso=" << holabso << "\n" 
         << TAG_INFO << "Ninputprop/Ninput=" << ninputprop << "/" << ninput << ", Noutputprop/Noutput=" << noutputprop << "/" << noutput
         << ", DOSinput=" << dosinput << ", DOSoutput=" << dosoutput << ", DOSfree=" << dosfree 
-        << ", Hamiltonian_spmat_density=" << 100.*hamiltonian.density() << "%\n";
+        << ", Hamiltonian_sparse_density=" << 100.*hamiltonian.density() << "%\n";
 }
 
 /**
@@ -188,7 +188,7 @@ void WaveSystem::plotHamiltonian() const {
     std::string filename;
     uniqueFilename("out/" + sysname + "/hamiltonian/hamiltonian_", ".ppm", filename);
     
-    double fsize = 3*npoint*npoint; // Estimated file size in bytes (octets).
+    double fsize = 3*std::pow(static_cast<double>(npoint), 2); // Estimated file size in bytes (octets).
     std::cout << TAG_INFO << "Plot Hamiltonian to file '" << filename << "', size " << fsize/1e6 << " Mo...\n";
     
     hamiltonian.printImage(filename);
@@ -202,7 +202,7 @@ void WaveSystem::plotInputState() const {
     std::string filename;
     uniqueFilename("out/" + sysname + "/input_state/input_state_", ".ppm", filename);
     
-    double fsize = 3*npoint*ninput; // Estimated file size in bytes (octets).
+    double fsize = 3*static_cast<double>(npoint)*ninput; // Estimated file size in bytes (octets).
     std::cout << TAG_INFO << "Plot input state to file '" << filename << "', size " << (fsize/1e6) << " Mo...\n";
     
     inputState.printImage(filename);
@@ -216,7 +216,7 @@ void WaveSystem::plotOutputState() const {
     std::string filename;
     uniqueFilename("out/" + sysname + "/output_state/output_state_", ".ppm", filename);
     
-    double fsize = 3*npoint*noutput; // Estimated file size in bytes (octets).
+    double fsize = 3*static_cast<double>(npoint)*noutput; // Estimated file size in bytes (octets).
     std::cout << TAG_INFO << "Plot output state to file '" << filename << "', size " << (fsize/1e6) << " Mo...\n";
     
     outputState.printImage(filename);
@@ -254,7 +254,7 @@ void WaveSystem::plotIntensity(const RealMatrix& intensity, const std::string de
     std::string filename;
     uniqueFilename("out/" + sysname + "/" + dataname + "/" + dataname + "_", ".csv", filename);
     
-    double fsize = (prec+4.)*npoint*nstate + 3.*DIMENSION*(std::log10(npoint)+2.)*npoint;  // Roughly estimated file size in bytes (octets).
+    double fsize = ( (prec+4.)*nstate + 3.*DIMENSION*(std::log10(npoint)+2.) ) * static_cast<double>(npoint);  // Roughly estimated file size in bytes (octets).
     std::cout << TAG_INFO << "Plot intensity to file '" << filename << "', size ~" << (fsize/1e6) << " Mo...\n";
     
     std::ofstream ofs(filename); // Open the output file.
@@ -289,8 +289,9 @@ void WaveSystem::plotIntensity(const RealMatrix& intensity, const std::string de
         }
         ofs << "\n";
     }
+    ofs.close();  // Close the stream before calling an external script (this may cause I/O trouble).
     
-    std::string cmd("plot/plot_map.py I_0 " + filename);
+    std::string cmd("plot/plot_map.py lin I_0 " + filename);
     std::cout << TAG_EXEC << cmd << "\n";
     if (std::system(cmd.c_str())) {
         std::cout << TAG_WARN << "The plot script returned an error.\n";
@@ -612,13 +613,13 @@ void WaveSystem::transmissionStates(ComplexMatrix& tstate, RealMatrix& tval) {
     // 1. First check for possible errors:
     const int ntval = std::min(ninput, noutput);
     if (tstate.getNrow() != npoint || tstate.getNcol() != ntval) {
-        std::string msg = "In computeTStates(): Invalid size of 'tstate'. Received ("
+        std::string msg = "In transmissionStates(): Invalid size of 'tstate'. Received ("
                         + std::to_string(tstate.getNrow()) + ", " + std::to_string(tstate.getNcol()) + "), expected ("
                         + std::to_string(npoint) + ", " + std::to_string(ntval) + ").";
         throw std::invalid_argument(msg);
     }
     else if (tval.getNrow() != ntval || tval.getNcol() != 1) {
-        std::string msg = "In computeTStates(): Invalid size of 'tval'. Received ("
+        std::string msg = "In transmissionStates(): Invalid size of 'tval'. Received ("
                         + std::to_string(tval.getNrow()) + ", " + std::to_string(tval.getNcol()) + "), expected ("
                         + std::to_string(ntval) + ", 1).";
         throw std::invalid_argument(msg);
@@ -643,7 +644,7 @@ void WaveSystem::transmissionStates(ComplexMatrix& tstate, RealMatrix& tval) {
     for (int jmode = 0; jmode < ninput; jmode++) {// Loop over the input waveguide modes.
         for (int istate = 0; istate < ninput; istate++) {// Loop over the input transmission eigenstates.
             vh(istate, jmode) *= std::conj(I*std::sqrt(2.*ninputprop/(PI*dosinput))*std::sqrt(inputKlh(jmode, 0).real()));
-            // Each column of "V" is the transmission eigenstate (in modal representation).
+            // Each column of "V" (row of V^H) is the transmission eigenstate (in modal representation).
             // Note that the real part, Re(inputKlh), strips the evanescent modes.
         }
     }
@@ -674,24 +675,48 @@ void WaveSystem::transmissionProfiles(const RealMatrix& trange, RealMatrix& tpro
     const int nprofile = trange.getNrow();
     const int ntval = std::min(ninput, noutput);
     if (trange.getNcol() != 2) {
-        throw std::invalid_argument("In computeTProfiles(): Invalid size of 'trange', expected 2 columns for Tmin and Tmax.");
+        throw std::invalid_argument("In transmissionProfiles(): Invalid size of 'trange', expected 2 columns for Tmin and Tmax.");
     }
     else if (tprofile.getNrow() != npoint || tprofile.getNcol() != nprofile) {
-        std::string msg = "In computeTProfiles(): Invalid size of 'tprofile'. Received ("
+        std::string msg = "In transmissionProfiles(): Invalid size of 'tprofile'. Received ("
                         + std::to_string(tprofile.getNrow()) + ", " + std::to_string(tprofile.getNcol()) + "), expected ("
                         + std::to_string(npoint) + ", " + std::to_string(nprofile) + ").";
         throw std::invalid_argument(msg);
     }
     else if (nsample.getNrow() != nprofile || nsample.getNcol() != 1) {
-        std::string msg = "In computeTProfiles(): Invalid size of 'nsample'. Received ("
+        std::string msg = "In transmissionProfiles(): Invalid size of 'nsample'. Received ("
                         + std::to_string(nsample.getNrow()) + ", " + std::to_string(nsample.getNcol()) + "), expected ("
                         + std::to_string(nprofile) + ", 1).";
         throw std::invalid_argument(msg);
     }
+    else if (tval.getNrow() != ntval || tval.getNcol() != 1) {
+        std::string msg = "In transmissionProfiles(): Invalid size of 'tval'. Received ("
+                        + std::to_string(tval.getNrow()) + ", " + std::to_string(tval.getNcol()) + "), expected ("
+                        + std::to_string(ntval) + ", 1).";
+        throw std::invalid_argument(msg);
+    }
     
     // 2. Compute all the transmission eigenstates (and the transmission eigenvalues):
-    ComplexMatrix tstate(npoint, ntval);
-    transmissionStates(tstate, tval);
+    //~ ComplexMatrix tstate(npoint, ntval);
+    //~ transmissionStates(tstate, tval);
+    
+    /**
+     * WARNING - SOMETHING IS WRONG HERE !!!
+     * 
+     * Matrix "tstate" is dimension (npoint, ntval) with ntval=min(ninput, noutput).
+     * However, unitary matrix "V" is dimension (ninput, ninput) which is incompatible if noutput != ninput.
+     * 
+     * An elegant way to fix this is to compute only the transmission states we need...
+     * This would be far more efficient !!!
+     */
+    
+    ComplexMatrix tmat(noutput, ninput), u(noutput, noutput), vh(ninput, ninput);
+    transmissionMatrix(tmat);  // We only need the transmission matrix, not the reflection matrix.
+    svd(tmat, tval, u, vh);  // Perform the SVD. t = U S V^H  -->  t^H t = V S^2 V^H. Each row of V^H is the conjugate of a transmission eigenstate (in modal representation).
+    
+    for (int i = 0; i < ntval; i++) {// Loop on the singular values.
+        tval(i, 0) = tval(i, 0)*tval(i, 0);  // Compute the transmission eigenvalues from the singular values.
+    }
     
     // 3. Compute the square modulus of selected transmission eigenstates:
     double tm, dt, t;
@@ -708,8 +733,18 @@ void WaveSystem::transmissionProfiles(const RealMatrix& trange, RealMatrix& tpro
             
             if (std::abs(t - tm) < dt) {// If "t" is in the interval [Tmin, Tmax], then add the profile.
                 
+                // Compute the square modulus of the transmission state:
                 for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points of the mesh.
-                    psi = tstate(ipoint, ival);
+                    
+                    //~ psi = tstate(ipoint, ival);
+                    
+                    // Compute the transmission eigenstate associated to "t":
+                    psi = 0.;
+                    for (int imode = 0; imode < ninput; imode++) {// Loop over the input modes to construct the transmission eigenstate at "ipoint".
+                        psi += green(ipoint, imode) * I*std::sqrt(2.*ninputprop/(PI*dosinput)) 
+                             * std::sqrt(inputKlh(imode, 0).real()) * std::conj(vh(ival, imode));
+                    }
+                    
                     tprofile(ipoint, iprofile) += psi.real()*psi.real() + psi.imag()*psi.imag();
                 }
                 nsample(iprofile, 0) += 1;  // Increments the number of found profiles.

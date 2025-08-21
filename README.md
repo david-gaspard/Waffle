@@ -21,7 +21,7 @@ This program primarily focuses on the computation of the transmission and reflec
 
 The stationary wave equation reads:
 
-<p>$$ ( \nabla^2 + k^2 - U(\mathbr{r}) ) \psi(\mathbf{r}) = 0 $$</p>
+<p>$$ ( \nabla^2 + k^2 - U(\mathbf{r}) ) \psi(\mathbf{r}) = 0 $$</p>
 
 where $\psi(\mathbf{r})$ is the wavefunction, $k$ is the wavenumber, and $U(\mathbf{r})$ is the random potential whose fluctuations are related to the scattering [mean free path](https://en.wikipedia.org/wiki/Mean_free_path) $\ell_{\mathrm{s}}$.
 However, it should be noted that the program actually solves a discretized variant of the wave equation defined on a square lattice of step $h$:

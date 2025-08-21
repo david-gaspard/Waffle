@@ -73,7 +73,7 @@ int SparseComplexMatrix::getNcol() const {
  * The maximum density is 1.
  */
 double SparseComplexMatrix::density() const {
-    return ((double)triplet.size())/(nrow*ncol);
+    return static_cast<double>(triplet.size())/(static_cast<double>(nrow) * static_cast<double>(ncol));
 }
 
  /**

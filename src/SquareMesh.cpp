@@ -14,7 +14,7 @@
  * Constructor of the Square Mesh object.
  */
 SquareMesh::SquareMesh() {
-    //std::cout << TAG_INFO << "Creating SquareMesh...\n";
+    std::cout << TAG_INFO << "Creating SquareMesh...\n";
     ready = false;
 }
 
@@ -525,7 +525,7 @@ void SquareMesh::saveMeshShort(const std::string& filename, const char* sep) con
         ofs << "\n";
     }
     
-    ofs.close();
+    ofs.close(); // Ensure the stream is closed before calling an external script (this may cause I/O trouble).
 }
 
 /**
