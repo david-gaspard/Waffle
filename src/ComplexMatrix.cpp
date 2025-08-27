@@ -5,6 +5,7 @@
  * @file C++ code providing the implementation of the dense complex matrix.
  ***/
 #include "ComplexMatrix.hpp"
+#include "Color.hpp"
 #include <random>
 #include <iostream>
 
@@ -639,4 +640,30 @@ void ComplexMatrix::print(const std::string& name) const {
     }
     std::cout << "]" << std::endl;
     
+}
+
+/**
+ * Plots the complex matrix to a portable pixmap file, a PPM file (see: https://en.wikipedia.org/wiki/Netpbm).
+ */
+void ComplexMatrix::saveImage(const std::string& filename) const {
+    
+    // Open a file in binary mode:
+    std::ofstream ofs(filename, std::ios::binary);
+    ofs << "P6 " << (uint32_t)ncol << ' ' << (uint32_t)nrow << ' ' << (uint32_t)MAX_COLOR << ' ';
+    
+    dcomplex elem;
+    for (int i = 0; i < nrow; i++) {// Loop over the rows.
+        for (int j = 0; j < ncol; j++) {// Loop over the columns.
+            
+            elem = data[i + j*nrow];  // Extract the matrix element (without changing the matrix state).
+            
+            if (elem.real() != 0. || elem.imag() != 0.) {// If the matrix element is non-zero, then pick up a color.
+                //ofs << complexColor1(elem);
+                ofs << complexColor2(elem);
+            }
+            else {// Otherwise, draw white pixel.
+                ofs << COLOR_WHITE;
+            }
+        }
+    }
 }

@@ -148,9 +148,9 @@ def plot_map(args):
     if (mode == "log"):
         matrix = np.log10(matrix)
     
-    #cmap = SUNSET_CMAP  ## Use custom 'sunset' colormap.
-    cmap = mplt.cm.turbo ## Use 'turbo' colormap.
+    cmap = mplt.cm.turbo ## Use 'turbo' colormap (recommended).
     #cmap = mplt.cm.jet ## Use 'jet' colormap.
+    #cmap = SUNSET_CMAP  ## Use custom 'sunset' colormap.
     #mplt.imshow(matrix, cmap=cmap)  ## Show the plot in live (optional).
     #mplt.colorbar()
     #mplt.show()

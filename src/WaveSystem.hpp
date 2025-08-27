@@ -67,7 +67,7 @@ class WaveSystem {
     std::string getName() const;
     
     // Print methods:
-    void printInfo() const;
+    void summary() const;
     void infoHamiltonian() const;
     void plotHamiltonian() const;
     void plotInputState() const;

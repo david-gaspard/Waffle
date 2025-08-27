@@ -9,14 +9,42 @@
 
 /**
  * @todo TODO:
- * DONE: (1) In WaveSystem: If possible, compute the exact expression of the free DOS on a square lattice. It is used in setDisorder()...
- * (2): In Waffle/Usador: Make the figures for Arthur (see below)...
- * (3): In WaveSystem: Check in doing math that the normalization of transmission eigenstates is correct.
- * (4) In Main: Add histogram of transmission eigenvalues...
- * (5) In Main: Add parallelized taskTransmissionOMP()...
- * DONE: (6) In plot_map.py: Fix the partial read bug with the CSV reader which occurs when it is called by the C++ program...
- * (7) In SquareMesh: Create addImage(filename) to import PNG in order to facilitate the mesh creation...
- * (8) In SparseComplexMatrix: Improve plotImage() to export directly a PNG image instead of a heavy PPM file.
+ * DONE: (1)  In WaveSystem: If possible, compute the exact expression of the free DOS on a square lattice. It is used in setDisorder()...
+ * DONE: (2)  In Waffle/Usador: Make the figures for Arthur (see below)...
+ * DONE: (3)  In WaveSystem: Check in doing math that the normalization of transmission eigenstates is correct.
+ * DONE: (4)  Calculate the condition number of the "hamiltonian" for a waveguide by estimating the lowest eigenstate. 
+ *            This would indicate whether using iterative methods (instead of direct solvers) is relevant or not...
+ * 
+ * (5)  In SparseComplexMatrix: Try to optimize the construction of the Hamiltonian. 
+ *      (a) Check if better to preallocate correct number of nonzero elements.
+ *      (b) Check also if there is a faster object than "vector" for insertion:
+ *          - See "map" (binary tree): faster for insertion than "vector" (no realloc), faster for accessing by key, slower for traversal (no direct linkage).
+ *            Probably most appropriate choice if and only if traversal is not too slow compared to "vector".
+ *          - See "forward_list" (linked list): faster for insertion than vector (no realloc), faster for traversal, slower for accessing by key 
+ *            (no binary search). Both objects should be tested for speed in construction and in conversion for UMFPack.
+ *      (c) Note that if binary trees are indeed faster for sorted insertion/deletion, then "set" would be more appropriate for the points in SquareMesh...
+ * 
+ * (6)  In Main: Add histogram of transmission eigenvalues. Simply save all raw eigenvalues in a CSV file (each row per disorder realization)...
+ * (7)  Write "plot_histo.py" to plot the histogram of a list of values in given interval [Tmin, Tmax] using Nbins.
+ * (8)  In Main: Add parallelized taskTransmissionOMP()...
+ * DONE: (9)  In plot_map.py: Fix the partial read bug with the CSV reader which occurs when it is called by the C++ program...
+ * (10) Create script "plot_cut.py" to plot the intensity profile along a cut. A straight line should do the job...
+ * (11) In SquareMesh: Create addImage(filename) to import PNG in order to facilitate the mesh creation...
+ * (12) In SparseComplexMatrix: Improve plotImage() to export directly a PNG image instead of a heavy PPM file.
+ * (13) Do no forget to implement the absorption (holabso != 0) using complex wavenumbers.
+ *      Check that the implementation is correct, maybe using the Green function, or the distribution rho(T) (which should match RecurGreen's results)...
+ * (14) In all plot scripts: Extract the header of the CSV file and copy it into the "title" of pgfplots' "axis" environment.
+ */
+
+/**
+ * @todo TODO for Arthur (before Friday 2025-08-22 Morning):
+ * 
+ * DONE - Waveguide simulation: 1 realization (log scale) + average (lin scale) for T=1 and T=0.1, and L/lscat=10.
+ * DONE - Transmission in a slab for large/small output (panels (a) + (b)). Also microscopic simulation 1 realization (log scale) + average (lin scale).
+ * DONE - Remission in a slab with 5 mean free path (Usadel solution). Injection from bottom to top. No microscopic simulation.
+ * DONE - Double waveguide with/without absorber. Use x/l (not l_s).
+ * DONE - Maze with/without absorber.
+ * DONE - Send Eiffel tower solution Usadel with axes x/l, y/l, ideally with corresponding micro simulations...
  */
 
 /**
@@ -27,14 +55,18 @@ struct Context {
     RealMatrix trange;
 };
 
+/***************************************************************************************************
+ * SYSTEM CREATION FUNCTIONS
+ ***************************************************************************************************/
+
 /**
  * Create a waveguide-shape system of given "length" and "width" (in number of lattice points),
  * and defines the range of transmission values of interest for computing the disorder-averaged profile of transmission eigenchannels. 
  */
 Context createWaveguide() {
     
-    const int length = 80;    // Number of points in the longitudinal direction, L/h. Default: 150. Better to reach length=width=300 with kh=0.5.
-    const int width  = 50;   // Number of points in the transverse direction, W/h. Default: 150. 
+    const int length = 150;   // Number of points in the longitudinal direction, L/h. Default: 150. Better to reach length=width=300 with kh=0.5.
+    const int width  = 150;   // Number of points in the transverse direction, W/h. Default: 150. 
     
     const double dscat = 8.5;  // Scattering depth, L/lscat. Default: dscat=8.5 (in order to get approximately dscat_eff=10).
     const double dabso = 0.;   // Absorption depth, L/labso.
@@ -219,12 +251,103 @@ Context createSlabRemission1() {
     const double holabso = dabso/length;
     
     RealMatrix trange(3, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    trange(0, 0) = 0.100;  trange(0, 1) = 0.050; // trange(0, 1) = 0.030;
+    trange(0, 0) = 0.100;  trange(0, 1) = 0.030;
     trange(1, 0) = 0.050;  trange(1, 1) = 0.010;
     trange(2, 0) = 0.010;  trange(2, 1) = 0.002;
     
     return {WaveSystem(name, mesh, kh, holscat, holabso), trange};
 }
+
+/**
+ * Create a double waveguide with a minute asymmetry.
+ */
+Context createDoubleWaveguide1() {
+    
+    const int tlength = 300;          // Number of lattice points in the longitudinal direction, L/h.
+    const int twidth  = 300;          // Number of lattice points in the transverse direction, W/h.
+    const int xwidth  = tlength/5;    // Width of the corridors near input/output.
+    const int ywidth  = twidth/5;     // Width of the corridors of the two waveguides (before the yshift).
+    const int yshift  = twidth/50;    // Transverse shift.
+    
+    const double dscat = 8.5;  // Scattering depth, L/lscat.
+    const double dabso = 0.;   // Absorption depth, L/labso.
+    
+    const std::string name = "DoubleWaveguide1_" + std::to_string(tlength) + "x" + std::to_string(twidth) 
+                           + "_cx" + std::to_string(xwidth) + "_cy" + std::to_string(ywidth) + "_yshift" + std::to_string(yshift) 
+                           + "/dscat_" + to_string_prec(dscat, 6);
+    
+    // Construct the mesh:
+    SquareMesh mesh;
+    mesh.addRectangle(0, tlength, 0, twidth, BND_MIRROR);
+    mesh.removeRectangle(xwidth, tlength-xwidth, ywidth+yshift, twidth-ywidth+yshift);
+    
+    // Setup boundary conditions:
+    mesh.setBoundaryRectangle(0, 0, 0, twidth, DIR_WEST, BND_INPUT);
+    mesh.setBoundaryRectangle(tlength, tlength, 0, twidth, DIR_EAST, BND_OUTPUT);
+    mesh.setBoundaryRectangle(xwidth-1, xwidth-1, ywidth+yshift, twidth-ywidth+yshift, DIR_EAST, BND_OPEN);
+    
+    mesh.finalize();
+    
+    // Defines the physical parameters:
+    const double kh = 1.;  // Wavenumber times the lattice step. Recommended: kh = 1 -> lambda/h = 6.
+    const double holscat = dscat/tlength;
+    const double holabso = dabso/tlength;
+    
+    RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
+    trange(0, 0) = 0.880;  trange(0, 1) = 0.010;  //trange(0, 0) = 0.880;  trange(0, 1) = 0.030;
+    trange(1, 0) = 0.730;  trange(1, 1) = 0.030;
+    trange(2, 0) = 0.500;  trange(2, 1) = 0.020;
+    trange(3, 0) = 0.100;  trange(3, 1) = 0.010;
+    
+    return {WaveSystem(name, mesh, kh, holscat, holabso), trange};
+}
+
+/**
+ * Create a double waveguide with a minute asymmetry.
+ */
+Context createDoubleWaveguide2() {
+    
+    const int tlength = 300;          // Number of lattice points in the longitudinal direction, L/h.
+    const int twidth  = 300;          // Number of lattice points in the transverse direction, W/h.
+    const int xwidth  = tlength/5;    // Width of the corridors near input/output.
+    const int ywidth  = twidth/5;     // Width of the corridors of the two waveguides (before the yshift).
+    const int yshift  = twidth/50;    // Transverse shift.
+    
+    const double dscat = 8.5;  // Scattering depth, L/lscat.
+    const double dabso = 0.;   // Absorption depth, L/labso.
+    
+    const std::string name = "DoubleWaveguide2_" + std::to_string(tlength) + "x" + std::to_string(twidth) 
+                           + "_cx" + std::to_string(xwidth) + "_cy" + std::to_string(ywidth) + "_yshift" + std::to_string(yshift) 
+                           + "/dscat_" + to_string_prec(dscat, 6);
+    
+    // Construct the mesh:
+    SquareMesh mesh;
+    mesh.addRectangle(0, tlength, 0, twidth, BND_MIRROR);
+    mesh.removeRectangle(xwidth, tlength-xwidth, ywidth+yshift, twidth-ywidth+yshift);
+    
+    // Setup boundary conditions:
+    mesh.setBoundaryRectangle(0, 0, 0, twidth, DIR_WEST, BND_INPUT);
+    mesh.setBoundaryRectangle(tlength, tlength, 0, twidth, DIR_EAST, BND_OUTPUT);
+    
+    mesh.finalize();
+    
+    // Defines the physical parameters:
+    const double kh = 1.;  // Wavenumber times the lattice step. Recommended: kh = 1 -> lambda/h = 6.
+    const double holscat = dscat/tlength;
+    const double holabso = dabso/tlength;
+    
+    RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
+    trange(0, 0) = 0.980;  trange(0, 1) = 0.020;
+    trange(1, 0) = 0.880;  trange(1, 1) = 0.030;
+    trange(2, 0) = 0.730;  trange(2, 1) = 0.030;
+    trange(3, 0) = 0.500;  trange(3, 1) = 0.020;
+    
+    return {WaveSystem(name, mesh, kh, holscat, holabso), trange};
+}
+
+/***************************************************************************************************
+ * COMPUTATIONAL FUNCTIONS
+ ***************************************************************************************************/
 
 /**
  * Compute all quantities related to transmission for the given WaveSystem "sys", in particular the transmission-eigenvalue distribution,
@@ -233,7 +356,7 @@ Context createSlabRemission1() {
  */
 void taskTransmissionSerial(WaveSystem& sys, RealMatrix& trange) {
     
-    const uint64_t nseed = 1;  // Number of realizations of the disorder. Recommended for high quality: 10^4.
+    const uint64_t nseed = 20;  // Number of realizations of the disorder. Recommended for high quality: 10^4.
     
     const int npoint = sys.getNPoint();
     const int nprofile = trange.getNrow();  // Get the desired number of profiles.
@@ -260,6 +383,8 @@ void taskTransmissionSerial(WaveSystem& sys, RealMatrix& trange) {
         if (tmax < tmax_min) tmax_min = tmax;
         
         printProgressBar(seed, nseed, msg, start);
+        
+        //if (nsample(0, 0) >= 1) break;  // COnditional break (useful to find exactly one eigenstate).
     }
     tavg /= nprop*nseed;  // Normalize the average transmission probability.
     const double dscat_eff = (PI/2.) * (1./tavg - 1.);   // Effective scattering depth.
@@ -297,25 +422,16 @@ int main(int argc, char** argv) {
     
     std::cout << "****** This is " << PROGRAM_COPYRIGHT << " ******\n";
     
-    /**
-     * @todo TODO for Arthur (before Friday 2025-08-22 Morning):
-     * 
-     * - Waveguide simulation: 1 realization (log scale) + average (lin scale) for T=1 and T=0.1, and L/lscat=10.
-     * - Transmission in a slab for large/small output (panels (a) + (b)). Also microscopic simulation 1 realization (log scale) + average (lin scale).
-     * - Remission in a slab with 5 mean free path (Usadel solution). Injection from bottom to top. No microscopic simulation.
-     * - Double waveguide with/without absorber. Use x/l (not l_s).
-     * - Maze with/without absorber.
-     * - Send Eiffel tower solution Usadel with axes x/l, y/l, ideally with corresponding micro simulations...
-     */
-    
     // Create the simulation context:
-    //Context ctx = createWaveguide();
+    Context ctx = createWaveguide();
     //Context ctx = createSlabTransmission1();
     //Context ctx = createSlabTransmission2();
     //Context ctx = createSlabTransmission3();
-    Context ctx = createSlabRemission1();
+    //Context ctx = createSlabRemission1();
+    //Context ctx = createDoubleWaveguide1();
+    //Context ctx = createDoubleWaveguide2();
     
-    ctx.sys.printInfo();
+    ctx.sys.summary();
     //ctx.sys.infoHamiltonian();
     //ctx.sys.plotMesh();
     //ctx.sys.plotInputState();

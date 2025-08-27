@@ -10,8 +10,8 @@
 /**
  * Print generic informations about the matrix.
  */
-void printMatrixInfo(const std::string& name, const SparseComplexMatrix& a) {
-    a.printInfo(name);
+void printInfoMatrix(const std::string& name, const SparseComplexMatrix& a) {
+    a.summary(name);
     a.print(name);
 }
 
@@ -34,9 +34,9 @@ int testFilling1() {
     std::cout << TAG_INFO << "matrix(4, 0)   = " << matrix.get(4, 0) << "\n";
     std::cout << TAG_INFO << "matrix.getNnz  = " << matrix.getNnz() << "\n";
     
-    printMatrixInfo("Matrix", matrix);
+    printInfoMatrix("Matrix", matrix);
     
-    //printMatrixInfo("Matrix*", matrix.conj());
+    //printInfoMatrix("Matrix*", matrix.conj());
     
     return 0;
 }
@@ -56,7 +56,7 @@ int testFilling2() {
             matrix(j, i) = matrix(i, j);
         }
     }
-    printMatrixInfo("Matrix", matrix);
+    printInfoMatrix("Matrix", matrix);
     
     return 0;
 }
@@ -101,12 +101,11 @@ int testSolveUmfpack1() {
     
     const int n = 5;
     SparseComplexMatrix a(n, n);
-    a.setSymmetry(0);
     
     a(0, 0) = 2;   a(1, 0) = 3;  a(0, 1) = 3;  a(2, 1) = -1;  a(4, 1) = 4;  a(1, 2) = 4;
     a(2, 2) = -3;  a(3, 2) = 1;  a(4, 2) = 2;  a(2, 3) = 2;   a(1, 4) = 6;  a(4, 4) = 1;
     
-    //printMatrixInfo("A", a);
+    //printInfoMatrix("A", a);
     
     SparseComplexMatrix b(n, 1);
     b(0, 0) = 8;  b(1, 0) = 45;  b(2, 0) = -3;  b(3, 0) = 3;  b(4, 0) = 19; 
@@ -132,12 +131,11 @@ int testSolveUmfpack2() {
     
     const int n = 5;
     SparseComplexMatrix a(n, n);
-    a.setSymmetry(1);
     
     a(0, 0) = 2;  a(1, 0) = 6;  a(0, 1) = 6;  a(2, 1) =  3;  a(4, 1) = 10;  a(1, 2) = 3;  a(2, 2) = -3;
     a(3, 2) = 3;  a(4, 2) = 2;  a(2, 3) = 3;  a(1, 4) = 10;  a(2, 4) =  2;  a(4, 4) = 1;
     
-    //printMatrixInfo("A", a);
+    //printInfoMatrix("A", a);
     
     SparseComplexMatrix b(n, 1);
     b(0, 0) = 14;  b(1, 0) = 65;  b(2, 0) = 19;  b(3, 0) = 9;  b(4, 0) = 31;
@@ -164,7 +162,6 @@ int testSolveUmfpack3() {
     // 1. Prepare matrix 'A':
     const int n = 5;
     SparseComplexMatrix a(n, n);
-    a.setSymmetry(0);
     
     a(0, 0) = dcomplex(2, -1);
     a(0, 1) = dcomplex(3, 2);
@@ -179,7 +176,7 @@ int testSolveUmfpack3() {
     a(4, 2) = dcomplex(-2, -1);
     a(4, 4) = dcomplex(-1, 5);
     
-    //printMatrixInfo("A", a);
+    //printInfoMatrix("A", a);
     
     // 2. Prepare independent term 'b':
     SparseComplexMatrix b(n, 3);
@@ -213,7 +210,7 @@ int main(int argc, char** argv) {
     
     //testFilling1();
     //testFilling2();
-    testHybridProduct();
+    //testHybridProduct();
     testSolveUmfpack1();
     testSolveUmfpack2();
     testSolveUmfpack3();

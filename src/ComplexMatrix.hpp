@@ -48,6 +48,7 @@ class ComplexMatrix {
     
     // Print methods:
     void print(const std::string& name) const;
+    void saveImage(const std::string& filename) const;
     
 };
 

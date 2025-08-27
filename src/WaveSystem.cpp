@@ -165,7 +165,7 @@ std::string WaveSystem::getName() const {
 /**
  * Print essential information about the current wave system to standard output.
  */
-void WaveSystem::printInfo() const {
+void WaveSystem::summary() const {
     std::cout << TAG_INFO << "WaveSystem with sysname='" << sysname << "', Npoint=" << npoint << ", kh=" << kh
         << ", h/lscat=" << holscat << ", h/labso=" << holabso << "\n" 
         << TAG_INFO << "Ninputprop/Ninput=" << ninputprop << "/" << ninput << ", Noutputprop/Noutput=" << noutputprop << "/" << noutput
@@ -177,7 +177,7 @@ void WaveSystem::printInfo() const {
  * Prints essential information about the sparse Hamiltonian matrix.
  */
 void WaveSystem::infoHamiltonian() const {
-    hamiltonian.printInfo("Hamiltonian");
+    hamiltonian.summary("Hamiltonian");
 }
 
 /**
@@ -191,7 +191,7 @@ void WaveSystem::plotHamiltonian() const {
     double fsize = 3*std::pow(static_cast<double>(npoint), 2); // Estimated file size in bytes (octets).
     std::cout << TAG_INFO << "Plot Hamiltonian to file '" << filename << "', size " << fsize/1e6 << " Mo...\n";
     
-    hamiltonian.printImage(filename);
+    hamiltonian.saveImage(filename);
 }
 
 /**
@@ -205,7 +205,7 @@ void WaveSystem::plotInputState() const {
     double fsize = 3*static_cast<double>(npoint)*ninput; // Estimated file size in bytes (octets).
     std::cout << TAG_INFO << "Plot input state to file '" << filename << "', size " << (fsize/1e6) << " Mo...\n";
     
-    inputState.printImage(filename);
+    inputState.saveImage(filename);
 }
 
 /**
@@ -219,7 +219,7 @@ void WaveSystem::plotOutputState() const {
     double fsize = 3*static_cast<double>(npoint)*noutput; // Estimated file size in bytes (octets).
     std::cout << TAG_INFO << "Plot output state to file '" << filename << "', size " << (fsize/1e6) << " Mo...\n";
     
-    outputState.printImage(filename);
+    outputState.saveImage(filename);
 }
 
 /**
@@ -637,6 +637,11 @@ void WaveSystem::transmissionStates(ComplexMatrix& tstate, RealMatrix& tval) {
         tval(i, 0) = tval(i, 0)*tval(i, 0);  // Compute the transmission eigenvalues from the singular values.
     }
     
+    //std::string filename;
+    //uniqueFilename("out/" + sysname + "/vh/vh_", ".ppm", filename);
+    //std::cout << TAG_INFO << "Plot output state to file '" << filename << "'...\n";
+    //vh.saveImage(filename);
+    
     // 4. Compute all the transmission eigenstates:
     computeGreenFunction();  // Ensure the Green function has been computed already (this line does nothing if it is so).
     
@@ -659,15 +664,13 @@ void WaveSystem::transmissionStates(ComplexMatrix& tstate, RealMatrix& tval) {
  * trange   = Selected ranges of transmission eigenvalues, [Tm-dT, Tm+dT], for which the transmission eigenchannels are desired. Size: (nprofile, 2).
  *            The first column contains the value of the centers of intervals, Tm, and the second column the half-width of the intervals, dT.
  * tprofile = On output, intensity profile (square modulus) of selected transmission eigenstates. Size: (npoint, nprofile).
+ *            The transmission eigenstate profiles are normalized so that the incident intensity is equal to 1 (approximately).
  *            Note that, if multiple transmission eigenstates are found in an interval [Tm-dT, Tm+dT], then they are summed up.
  *            If, on the contrary, no eigenstate is found, then the column of "tprofile" is set to zero.
  *            This method adds the profiles directly to "tprofile", so this matrix must be initialized to zero.
  * nsample  = On output, number of found transmission eigenstates in the prescribed intervals. Size: (nprofile, 1).
  *            This method increments the number of found transmission eigenstates, so "nsample" must be initialized to zero.
  * tval     = On output, list of all transmission eigenvalues (ignoring considerations on eigenstates). Size: (min(ninput, noutput), 1).
- * 
- * @todo Correct the normalization of "tprofile". The standard normalization is to fix the incident intensity as 1.
- * TODO............................................................................................................
  */
 void WaveSystem::transmissionProfiles(const RealMatrix& trange, RealMatrix& tprofile, RealMatrix& nsample, RealMatrix& tval) {
     
@@ -696,23 +699,11 @@ void WaveSystem::transmissionProfiles(const RealMatrix& trange, RealMatrix& tpro
         throw std::invalid_argument(msg);
     }
     
-    // 2. Compute all the transmission eigenstates (and the transmission eigenvalues):
-    //~ ComplexMatrix tstate(npoint, ntval);
-    //~ transmissionStates(tstate, tval);
-    
-    /**
-     * WARNING - SOMETHING IS WRONG HERE !!!
-     * 
-     * Matrix "tstate" is dimension (npoint, ntval) with ntval=min(ninput, noutput).
-     * However, unitary matrix "V" is dimension (ninput, ninput) which is incompatible if noutput != ninput.
-     * 
-     * An elegant way to fix this is to compute only the transmission states we need...
-     * This would be far more efficient !!!
-     */
-    
+    // 2. Compute the singular value decomposition of the transmission matrix:
     ComplexMatrix tmat(noutput, ninput), u(noutput, noutput), vh(ninput, ninput);
     transmissionMatrix(tmat);  // We only need the transmission matrix, not the reflection matrix.
-    svd(tmat, tval, u, vh);  // Perform the SVD. t = U S V^H  -->  t^H t = V S^2 V^H. Each row of V^H is the conjugate of a transmission eigenstate (in modal representation).
+    svd(tmat, tval, u, vh);  // Perform the SVD. t = U S V^H  -->  t^H t = V S^2 V^H. 
+    // NB: Each row of V^H is the conjugate of a transmission eigenstate (in modal representation).
     
     for (int i = 0; i < ntval; i++) {// Loop on the singular values.
         tval(i, 0) = tval(i, 0)*tval(i, 0);  // Compute the transmission eigenvalues from the singular values.
@@ -735,8 +726,6 @@ void WaveSystem::transmissionProfiles(const RealMatrix& trange, RealMatrix& tpro
                 
                 // Compute the square modulus of the transmission state:
                 for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points of the mesh.
-                    
-                    //~ psi = tstate(ipoint, ival);
                     
                     // Compute the transmission eigenstate associated to "t":
                     psi = 0.;
