@@ -169,7 +169,12 @@ def plot_map(args):
     ## Extract the ratio h/lscat:
     holscat = float(find_value_in_header("h/lscat", fp))
     
+    ## Import the header with essential information on the simulation:
+    with open(field_file, 'r') as f:
+        data_header = "".join([l for l in f if l.startswith("%")]).strip()
+    
     tikz_code = """%% Generated on {timestamp} by {my_program} {my_copyright}
+{data_header}
 \\begin{{tikzpicture}}[%
     /pgfplots/every axis/.append style={{%
         width=0.9\\textwidth,
@@ -196,6 +201,7 @@ def plot_map(args):
         timestamp = datetime.datetime.now().astimezone().strftime("%F at %T %z"),
         my_program = args[0],
         my_copyright = compile_tikz.MY_COPYRIGHT,
+        data_header = data_header,
         title  = "\\detokenize{" + field_file + "}\\\\ \\detokenize{"+ column_name + "}",
         xlabel = "$x/\\ell$",
         ylabel = "$y/\\ell$",
