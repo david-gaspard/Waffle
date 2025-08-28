@@ -34,7 +34,7 @@ WaveSystem::WaveSystem(const std::string& sysname, const SquareMesh& mesh, const
         outputKlh(noutput, 1),
         green(npoint, ninput)
     {
-    std::cout << TAG_INFO << "Creating WaveSystem, building Hamiltonian...\n";
+    //std::cout << TAG_INFO << "Creating WaveSystem...\n";
     setWavenumber(kh);
     setScattering(holscat);
     setAbsorption(holabso);
@@ -163,14 +163,36 @@ std::string WaveSystem::getName() const {
  ***********************************************************/
 
 /**
+ * Returns a unique output filename for the given "dataname" with given file "extension" (with dot).
+ */
+std::string WaveSystem::uniqueFile(const std::string& dataname, const std::string& extension) const {
+    std::string filename;
+    uniqueFilename("out/" + sysname + "/" + dataname + "/" + dataname + "_", extension, filename);
+    return filename;
+}
+
+/**
+ * Returns the summary of essential information about the current wave system.
+ */
+std::vector<std::string> WaveSystem::summary() const {
+    std::vector<std::string> smr;
+    smr.push_back("WaveSystem with sysname='" + sysname + "', Npoint=" + std::to_string(npoint) + ", kh=" + std::to_string(kh)
+        + ", lambda/h=[" + std::to_string(PI/std::asin(kh/2)) + ", " + std::to_string(PI/(std::sqrt(2.)*std::asin(kh/std::sqrt(8.)))) + "]");
+    smr.push_back("h/lscat=" + std::to_string(holscat) + ", h/labso=" + std::to_string(holabso)
+        + ", Ninputprop/Ninput=" + std::to_string(ninputprop) + "/" + std::to_string(ninput) 
+        + ", Noutputprop/Noutput=" + std::to_string(noutputprop) + "/" + std::to_string(noutput));
+    smr.push_back("DOSinput=" + std::to_string(dosinput) + ", DOSoutput=" + std::to_string(dosoutput) + ", DOSfree=" + std::to_string(dosfree) 
+           + ", Hamiltonian_sparse_density=" + std::to_string(100.*hamiltonian.density()) + "%");
+    return smr;
+}
+
+/**
  * Print essential information about the current wave system to standard output.
  */
-void WaveSystem::summary() const {
-    std::cout << TAG_INFO << "WaveSystem with sysname='" << sysname << "', Npoint=" << npoint << ", kh=" << kh
-        << ", h/lscat=" << holscat << ", h/labso=" << holabso << "\n" 
-        << TAG_INFO << "Ninputprop/Ninput=" << ninputprop << "/" << ninput << ", Noutputprop/Noutput=" << noutputprop << "/" << noutput
-        << ", DOSinput=" << dosinput << ", DOSoutput=" << dosoutput << ", DOSfree=" << dosfree 
-        << ", Hamiltonian_sparse_density=" << 100.*hamiltonian.density() << "%\n";
+void WaveSystem::printSummary() const {
+    for (const std::string& line : summary()) {// Loop over the lines of the summary.
+        std::cout << TAG_INFO << line << "\n";
+    }
 }
 
 /**
@@ -185,10 +207,9 @@ void WaveSystem::infoHamiltonian() const {
  */
 void WaveSystem::plotHamiltonian() const {
     
-    std::string filename;
-    uniqueFilename("out/" + sysname + "/hamiltonian/hamiltonian_", ".ppm", filename);
+    const std::string filename = uniqueFile("hamiltonian", ".ppm");
     
-    double fsize = 3*std::pow(static_cast<double>(npoint), 2); // Estimated file size in bytes (octets).
+    const double fsize = 3*std::pow(static_cast<double>(npoint), 2); // Estimated file size in bytes (octets).
     std::cout << TAG_INFO << "Plot Hamiltonian to file '" << filename << "', size " << fsize/1e6 << " Mo...\n";
     
     hamiltonian.saveImage(filename);
@@ -199,10 +220,9 @@ void WaveSystem::plotHamiltonian() const {
  */
 void WaveSystem::plotInputState() const {
     
-    std::string filename;
-    uniqueFilename("out/" + sysname + "/input_state/input_state_", ".ppm", filename);
+    const std::string filename = uniqueFile("input_state", ".ppm");
     
-    double fsize = 3*static_cast<double>(npoint)*ninput; // Estimated file size in bytes (octets).
+    const double fsize = 3*static_cast<double>(npoint)*ninput; // Estimated file size in bytes (octets).
     std::cout << TAG_INFO << "Plot input state to file '" << filename << "', size " << (fsize/1e6) << " Mo...\n";
     
     inputState.saveImage(filename);
@@ -213,10 +233,9 @@ void WaveSystem::plotInputState() const {
  */
 void WaveSystem::plotOutputState() const {
     
-    std::string filename;
-    uniqueFilename("out/" + sysname + "/output_state/output_state_", ".ppm", filename);
+    const std::string filename = uniqueFile("output_state", ".ppm");
     
-    double fsize = 3*static_cast<double>(npoint)*noutput; // Estimated file size in bytes (octets).
+    const double fsize = 3*static_cast<double>(npoint)*noutput; // Estimated file size in bytes (octets).
     std::cout << TAG_INFO << "Plot output state to file '" << filename << "', size " << (fsize/1e6) << " Mo...\n";
     
     outputState.saveImage(filename);
@@ -226,15 +245,13 @@ void WaveSystem::plotOutputState() const {
  * Plot the mesh contained in the present wave system.
  */
 void WaveSystem::plotMesh() const {
-    std::string filename;
-    uniqueFilename("out/" + sysname + "/mesh/mesh_", ".csv", filename);
-    mesh.plotMesh(filename);
+    mesh.plotMesh(uniqueFile("mesh", ".csv"));
 }
 
 /**
  * Save the given intensity profile to a CSV file and plot it using an external script.
  */
-void WaveSystem::plotIntensity(const RealMatrix& intensity, const std::string description, const std::string dataname) const {
+void WaveSystem::plotIntensity(const RealMatrix& intensity, const std::string& description, const std::string& dataname) const {
     
     if (intensity.getNrow() != npoint) {// First check for possible errors:
         std::string msg = "In plotIntensity(): Invalid intensity matrix, received nrow=" + std::to_string(intensity.getNrow()) 
@@ -251,22 +268,18 @@ void WaveSystem::plotIntensity(const RealMatrix& intensity, const std::string de
     const int nstate = intensity.getNcol();  // Number of states in the wavefunction.
     const char* sep = ", ";  // Separator used between entries of the CSV file.
     const int prec = 16;     // Precision used in printing double precision values.
-    std::string filename;
-    uniqueFilename("out/" + sysname + "/" + dataname + "/" + dataname + "_", ".csv", filename);
-    
-    double fsize = ( (prec+4.)*nstate + 3.*DIMENSION*(std::log10(npoint)+2.) ) * static_cast<double>(npoint);  // Roughly estimated file size in bytes (octets).
-    std::cout << TAG_INFO << "Plot intensity to file '" << filename << "', size ~" << (fsize/1e6) << " Mo...\n";
+    const std::string filename = uniqueFile(dataname, ".csv");
+    const double fsize = ( (prec+4.)*nstate + 3.*DIMENSION*(std::log10(npoint)+2.) ) * static_cast<double>(npoint);  // Roughly estimated file size in bytes (octets).
+    std::cout << TAG_INFO << "Save intensity to file '" << filename << "', size ~" << (fsize/1e6) << " Mo...\n";
     
     std::ofstream ofs(filename); // Open the output file.
     ofs << std::setprecision(prec); // Set the printing precision.
     writeTimestamp(ofs, "%% "); // Apply a timestamp at the beginning.
     
-    ofs << "%% Parameters: sysname='" << sysname << "', dataname='" << dataname << "', Npoint=" << npoint
-        << ", kh=" << kh << ", h/lscat=" << holscat << ", h/labso=" << holabso 
-        << "\n%% Ninputprop/Ninput=" << ninputprop << "/" << ninput << ", Noutputprop/Noutput=" << noutputprop << "/" << noutput 
-        << ", DOSinput=" << dosinput << ", DOSoutput=" << dosoutput << ", DOSfree=" << dosfree 
-        << ", Hamiltonian_spmat_density=" << 100.*hamiltonian.density() << "%"
-        << "\n%% Info: " << description << "\n"
+    for (const std::string& line : summary()) {// Write the summary to the file header.
+        ofs << "%% " << line << "\n";
+    }
+    ofs << "%% dataname='" + dataname + "'\n%% Info: " << description << "\n"
         << "x" << sep << "y" << sep << "north" << sep << "south" << sep << "east" << sep << "west";
     
     for (int istate = 0; istate < nstate; istate++) {// Loop over the input modes to finish the column names.
@@ -357,7 +370,7 @@ void WaveSystem::plotTransmissionStates() {
  * Creates the free part of the "Hamiltonian", (d_x^2 + d_y^2 + k^2) * h^2, and store the result within the present WaveSystem object.
  */
 void WaveSystem::computeHamiltonian() {
-    //std::cout << TAG_INFO << "Computing the Hamiltonian...\n";
+    std::cout << TAG_INFO << "Building the Hamiltonian...\n";
     
     MeshPoint p;
     dcomplex kh2 = dcomplex(kh*kh, MEPS);
@@ -418,7 +431,6 @@ void WaveSystem::setDisorder(const uint64_t seed) {
     //std::cout << TAG_INFO << "Setting disorder with seed=" << seed << "..." << std::endl;
     
     computed = false;  // Each time the Hamiltonian is modified, the Green function is no more valid and must be computed again.
-    MeshPoint p;
     double uh2;
     dcomplex kh2 = dcomplex(kh*kh, MEPS);
     
@@ -431,9 +443,7 @@ void WaveSystem::setDisorder(const uint64_t seed) {
     
     for (int i = 0; i < npoint; i++) {//Loop over the points of the mesh.
         
-        p = mesh.getPoint(i);
-        
-        if (not p.isOpening()) {// If the point is not in an opening.
+        if (not mesh.getPoint(i).isOpening()) {// If the point is not in an opening.
             uh2 = random_normal(rng);  // Generate a Gaussian random number with standard deviation "sigma".
             hamiltonian(i, i) = -4. + kh2 - uh2;  // Add the diagonal element of the Hamiltonian H(i, i) = -4 + (k*h)^2 - U*h^2.
         }

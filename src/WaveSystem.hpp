@@ -67,13 +67,15 @@ class WaveSystem {
     std::string getName() const;
     
     // Print methods:
-    void summary() const;
+    std::string uniqueFile(const std::string& dataname, const std::string& extension) const;
+    std::vector<std::string> summary() const;
+    void printSummary() const;
     void infoHamiltonian() const;
     void plotHamiltonian() const;
     void plotInputState() const;
     void plotOutputState() const;
     void plotMesh() const;
-    void plotIntensity(const RealMatrix& intensity, const std::string description, const std::string filename) const;
+    void plotIntensity(const RealMatrix& intensity, const std::string& description, const std::string& filename) const;
     void plotGreenFunction();
     void plotTransmissionStates();
     

@@ -116,7 +116,7 @@ std::string to_string_prec(const double value, const int prec) {
  * even complex values of "m" if necessary.
  */
 double ellipticK(const double m) {
-    if (m > 1.) {// Elliptic moduli larger than 1 are forbidden because then K(m) is complex.
+    if (m >= 1.) {// Elliptic moduli larger than 1 are forbidden because then K(m) is complex.
         throw std::invalid_argument("In ellipticK(): Elliptic moduli must be smaller than 1.");
     }
     

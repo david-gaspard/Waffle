@@ -31,9 +31,9 @@ However, it should be noted that the program actually solves a discretized varia
 In this equation, the matrix $\mathsf{L}$ represents the five-point Laplacian, defined by elements $-4$ along the diagonal and $+1$ with the four nearest neighbors (4-neighborhood), $(kh)^2$ is implicitly multiplied by the identity matrix, $\mathsf{u}$ is a diagonal matrix containing the values of $U(\mathbf{r})h^2$ on all grid points, and $\mathbf{\psi}$ is a column vector containing the values of the wavefunction on the grid points.
 It is important to note that the dispersion relation of this discretized wave equation is *not* isotropic. It reads
 
-<p>$$ 4\sin^2(k_xh/2) + 4\sin^2(k_yh/2) = (kh)^2 $$</p>
+<p>$$ 4\sin^2(p_xh/2) + 4\sin^2(p_yh/2) = (kh)^2 $$</p>
 
-and reduces to the standard isotropic dispersion $k_x^2+k_y^2=k^2$ only in the limit $h\rightarrow 0$ (for $k$ fixed).
+and reduces to the standard isotropic dispersion $p_x^2+p_y^2=k^2$ only in the limit $h\rightarrow 0$ (for $k$ fixed).
 In order to avoid forbidden directions of propagation, the wavenumber must be limited to $kh\leq 2$.
 A reasonable compromise between mitigating anisotropy and reducing the number of grid points is $kh=1$, which corresponds to about 6 points per wavelength.
 With this choice, the dispersion curve deviates by less than $2.5\%$ from a perfect circle.
