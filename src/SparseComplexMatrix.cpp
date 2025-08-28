@@ -315,7 +315,7 @@ void solveUmfpack(const SparseComplexMatrix& a, const SparseComplexMatrix& b, Co
     // 1. First check for possible errors in the input:
     checkSolverInput(a, b, x);
     
-    // 2. Convert the matrix into UMFPACK's compressed column format:
+    // 2. Convert the matrix into UMFPACK's compressed column format (~1000 times faster than solving):
     int32_t nnz = a.data.size();  // Estimate the number of nonzero (with/without symmetry).
     auto pcol = new int32_t[a.ncol+1]();
     auto irow = new int32_t[nnz];
@@ -338,7 +338,7 @@ void solveUmfpack(const SparseComplexMatrix& a, const SparseComplexMatrix& b, Co
     }
     pcol[a.ncol] = nnz;
     
-    // 4. Call UMFPACK for each right-hand side:
+    // 4. Call UMFPACK for each right-hand side (most time-consuming operation of the program):
     double info[UMFPACK_INFO];  // Output information (including UMFPACK's returned value "status").
     double control[UMFPACK_CONTROL]; // UMFPACK's control parameters (input).
     umfpack_zi_defaults(control); // Setup the default UMFPACK parameters for complex arrays (and long indices).

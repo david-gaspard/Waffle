@@ -21,8 +21,7 @@
  *              Probably most appropriate choice if and only if traversal is not too slow compared to "vector".
  *            - See "forward_list" (linked list): faster for insertion than vector (no realloc), faster for traversal, slower for accessing by key 
  *              (no binary search). Both objects should be tested for speed in construction and in conversion for UMFPack.
- * OMIT: (6) Note that if binary trees are indeed faster for sorted insertion/deletion, then "set" would be more appropriate for the points in SquareMesh...
- * 
+ * DONE: (6) Note that if binary trees are indeed faster for sorted insertion/deletion, then "set" would be more appropriate for the points in SquareMesh...
  * DONE: (7)  In Main: Add histogram of transmission eigenvalues. Simply save all raw eigenvalues in a CSV file (each row per disorder realization)...
  * DONE: (8)  Write "plot_histo.py" to plot the histogram of a list of values in given interval [Tmin, Tmax] using Nbins.
  * (9)  In Main: Add parallelized taskTransmissionOMP()...
@@ -32,7 +31,7 @@
  * (13) In SparseComplexMatrix: Improve plotImage() to export directly a PNG image instead of a heavy PPM file.
  * (14) Do no forget to implement the absorption (holabso != 0) using complex wavenumbers.
  *      Check that the implementation is correct, maybe using the Green function, or the distribution rho(T) (which should match RecurGreen's results)...
- * (15) In all plot scripts: Extract the header of the CSV file and copy it into the "title" of pgfplots' "axis" environment.
+ * DONE: (15) In all plot scripts: Extract the header of the CSV file and copy it into the "title" of pgfplots' "axis" environment.
  */
 
 /**
@@ -53,8 +52,8 @@ struct Context {
  */
 Context createWaveguide() {
     
-    const int length = 150;   // Number of points in the longitudinal direction, L/h. Default: 150. Better to reach length=width=300 with kh=0.5.
-    const int width  = 150;   // Number of points in the transverse direction, W/h. Default: 150. 
+    const int length = 300;   // Number of points in the longitudinal direction, L/h. Default: 150. Better to reach length=width=300 with kh=0.5.
+    const int width  = 300;   // Number of points in the transverse direction, W/h. Default: 150. 
     
     const double dscat = 8.5;  // Scattering depth, L/lscat. Default: dscat=8.5 (in order to get approximately dscat_eff=10).
     const double dabso = 0.;   // Absorption depth, L/labso.
@@ -507,7 +506,7 @@ int main(int argc, char** argv) {
     //ctx.sys.plotGreenFunction();
     //ctx.sys.plotTransmissionStates();
     
-    const int nseed = 10; // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
+    const int nseed = 1; // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
     
     taskTransmissionSerial(ctx.sys, ctx.trange, nseed);
     //taskTransmissionOMP(ctx.sys, ctx.trange, nseed);

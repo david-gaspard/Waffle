@@ -712,6 +712,7 @@ void WaveSystem::transmissionProfiles(const RealMatrix& trange, RealMatrix& tpro
     // 2. Compute the singular value decomposition of the transmission matrix:
     ComplexMatrix tmat(noutput, ninput), u(noutput, noutput), vh(ninput, ninput);
     transmissionMatrix(tmat);  // We only need the transmission matrix, not the reflection matrix.
+    
     svd(tmat, tval, u, vh);  // Perform the SVD. t = U S V^H  -->  t^H t = V S^2 V^H. 
     // NB: Each row of V^H is the conjugate of a transmission eigenstate (in modal representation).
     
@@ -719,7 +720,7 @@ void WaveSystem::transmissionProfiles(const RealMatrix& trange, RealMatrix& tpro
         tval(i, 0) = tval(i, 0)*tval(i, 0);  // Compute the transmission eigenvalues from the singular values.
     }
     
-    // 3. Compute the square modulus of selected transmission eigenstates:
+    // 3. Compute the square modulus of selected transmission eigenstates (second most time-consuming operation after the sparse system solution):
     double tm, dt, t;
     dcomplex psi;
     
