@@ -423,9 +423,11 @@ void SquareMesh::computeOpening() {
  * This method must be called after the mesh construction methods add*(), remove*(), and setBoundary*().
  */
 void SquareMesh::finalize() {
-    fixNeighbors(); // Fix the neighbors, O(N*log(N)).
-    computeOpening(); // Compute the openings, ~O(N).
-    ready = true; // The SquareMesh gets ready for computations.
+    if (not ready) {// Only finalize one time.
+        fixNeighbors(); // Fix the neighbors, O(N*log(N)).
+        computeOpening(); // Compute the openings, ~O(N).
+        ready = true; // The SquareMesh gets ready for computations.
+    }
 }
 
 /**

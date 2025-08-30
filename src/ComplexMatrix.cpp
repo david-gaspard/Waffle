@@ -588,7 +588,6 @@ ComplexMatrix modalMatrix(const int n) {
  * waveguide modes given by K_x,n = 2*arcsin(sqrt((k*h)^2 + d2ev_n)/2), where "d2ev" represents the eigenvalues of the 1D Laplacian matrix.
  * These eigenvalues are given by d2ev_n = -4*sin((n+1)*pi/(2*(N_y + 1)))^2. (see also function laplacianEigenvalues() above).
  * 
- * 
  * Arguments:
  * 
  * kh2  = Product kh*kh = (k*h)^2. Note that the imaginary part of "kh2" must be strictly positive (possibly vanishingly small).

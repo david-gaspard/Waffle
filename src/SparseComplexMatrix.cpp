@@ -1,5 +1,5 @@
 /****
- * @date Created on 2025-08-27 at 14:58:13 CEST
+ * @date Created on 2025-08-29 at 13:23:26 CEST
  * @author David Gaspard (ORCID 0000-0002-4449-8782) <david.gaspard@espci.fr>
  * @copyright This program is distributed under the MIT License.
  * @file C++ code providing the implementation for the SparseComplexMatrix object.
@@ -9,7 +9,8 @@
 #include "BaseTools.hpp"
 #include <suitesparse/umfpack.h>
 //#include <dmumps_c.h>
-#include <iostream>
+#include <algorithm>
+#include <fstream>
 
 /**
  * Constructor of the SparseComplexMatrix object when the dimensions are already known.
@@ -23,14 +24,23 @@ SparseComplexMatrix::SparseComplexMatrix(const int nrow, const int ncol) {
     }
     this->nrow = nrow;
     this->ncol = ncol;
+    sorted = false;  //At the beginning, the triplets are not sorted.
 }
 
 /**
- * Overloads the comparison operator between two indices. This overload is necessary to sort the matrix elements of the Map in column-major ordering.
- * Returns "true" if indices "id2" is located after "id1" according to the column-major ordering, "false" otherwise.
+ * Overloads the comparison operator between two triplets. This overload is necessary to sort the matrix elements in column-major ordering.
+ * Returns "true" if triplet "t2" is located after "t1" according to the column-major ordering, "false" otherwise.
  */
-bool operator<(const Indices& id1, const Indices& id2) {
-    return id1.j < id2.j || (id1.j == id2.j && id1.i < id2.i);
+bool operator<(const Triplet& t1, const Triplet& t2) {
+    return t1.j < t2.j || (t1.j == t2.j && t1.i < t2.i);
+}
+
+/**
+ * Overload the streaming operator to print triplet automatically.
+ */
+std::ostream& operator<<(std::ostream& os, const Triplet& t) {
+    os << "[ i=" << t.i << "  j=" << t.j << "  a=" << t.a.real() << (t.a.imag() >= 0. ? "+" : "") << t.a.imag() << "i ]";
+    return os;
 }
 
 /*******************************************************************************
@@ -41,7 +51,7 @@ bool operator<(const Indices& id1, const Indices& id2) {
  * Returns the number of nonzero elements in the SparseComplexMatrix.
  */
 int64_t SparseComplexMatrix::getNnz() const {
-    return data.size();
+    return triplet.size();
 }
 
 /**
@@ -59,11 +69,11 @@ int SparseComplexMatrix::getNcol() const {
 }
 
 /**
- * Returns the density of the present sparse matrix normalized to 1. The maximum density is 1.
- * The static cast is needed because the product nrow*ncol can exceed the capability of int32.
+ * Returns the density of the present sparse matrix normalized to 1.
+ * The maximum density is 1.
  */
 double SparseComplexMatrix::density() const {
-    return static_cast<double>(data.size())/(static_cast<double>(nrow) * static_cast<double>(ncol));
+    return static_cast<double>(triplet.size())/(static_cast<double>(nrow) * static_cast<double>(ncol));
 }
 
 /**
@@ -86,32 +96,89 @@ void SparseComplexMatrix::checkIndices(const int i, const int j) const {
 }
 
 /**
+ * Check if the present matrix if sorted, throws an error if it is not.
+ */
+void SparseComplexMatrix::checkSorted(const std::string& name) const {
+    if (not sorted) {
+        throw std::logic_error("In " + name + ": SparseComplexMatrix is not completely initialized. Please use finalize().");
+    }
+}
+
+/**
+ * Preallocate the memory occupied by the nonzero matrix elements.
+ * This operation is not necessary but recommended before adding matrix elements because it avoids the cost of reallocation.
+ */
+void SparseComplexMatrix::allocate(const int nnz) {
+    if (nnz <= 0) {
+        std::string msg = "In allocate(): Sparse matrix allocation size must be positive (received " + std::to_string(nnz) + ").";
+        throw std::invalid_argument(msg);
+    }
+    triplet.reserve(nnz);
+}
+
+/**
  * Returns the address of the matrix element A_ij. If the matrix element does not exist, then creates
  * a new matrix element before returning the address of the matrix element.
- * The triplets are automatically sorted so that binary search can be used to reduce the access time to O(log2(nnz)).
+ * The method is implemented in such a way that, if the elements are NORT sorted (in building phase), elements are pushed back (O(1) in time),
+ * otherwise if the elements are sorted (after finalize), binary search is used (which is O(log(N)) in time).
+ * In the exceptional case where an element is added in an already sorted matrix, insertion is used to maintain ordering (but it is O(N) in time).
  */
 dcomplex& SparseComplexMatrix::operator()(const int i, const int j) {
     
-    checkIndices(i, j);
+    checkIndices(i, j);  // First check the validity of indices.
+    // DO NOT call finalize() here because it will degrade the construction speed considerably, passing from O(N) to O(N^2).
     
-    return data[Indices{i, j}];
+    Triplet t;
+    t.i = i; t.j = j; t.a = dcomplex(0., 0.);
+    
+    if (not sorted) {// If the matrix is not sorted, i.e., still in construction, then use push_back(), it is O(1) in time.
+        triplet.push_back(t);  // Using push_back() is O(1) in time (and very fast), but O(N) if reallocation happens.
+                               // To mitigate this, just prealloce the vector "triplet" with the known number of nonzero elements.
+        return triplet.back().a;  // Returns the reference to the added matrix element.
+    }
+    else {// If the matrix is sorted, then uses binary search which is O(N*log(N)) in time.
+        auto p = std::lower_bound(triplet.begin(), triplet.end(), t); // Find the first element >= than the given triplet using binary search.
+        
+        if (p == triplet.end() || p->i != i || p->j != j) {// If the triplet does not exist in the current matrix.
+            // Note that the first condition prevents the pointer "p" to be dereferenced out of range (because end() always points out of the vector).
+            //std::cout << TAG_INFO << "Inserting new triplet " << t << "." << std::endl;
+            p = triplet.insert(p, t);  // Insert the new element. Pointer "p" is now guaranteed to point to the added triplet. This is O(N) in time.
+        }
+        return p->a;  // Returns the reference to the matrix element.
+    }
 }
 
 /**
  * Returns the element (i, j) of the matrix, or zero if the element does not exist.
- * This method is a getter: In contrast to operator(), it does not change the matrix state.
+ * This method is a getter: It does not change the matrix state.
  */
 dcomplex SparseComplexMatrix::get(const int i, const int j) const {
     
-    checkIndices(i, j);
+    checkIndices(i, j);   // First check the validity of indices.
+    checkSorted("get()"); // Then check that the matrix elements are sorted. Since get() is "const", it cannot call finalize itself.
     
-    auto p = data.find(Indices{i, j});
+    Triplet t;
+    t.i = i; t.j = j;
     
-    if (p == data.end()) {// If the matrix element is not found, then return zero.
-        return 0.;
+    auto p = std::lower_bound(triplet.begin(), triplet.end(), t);  // Find the first element >= than the given triplet using binary search.
+    
+    if (p == triplet.end() || p->i != i || p->j != j) {// If the triplet does not exist in the current matrix.
+        // Note that the first condition prevents the pointer "p" to be dereferenced out of range (because end() always points out of the vector).
+        return dcomplex(0., 0.);
     }
     
-    return p->second;  // If the element exists, then return it.
+    return p->a;
+}
+
+/**
+ * Finalize the sparse matrix by sorting the matrix elements in column-major ordering.
+ */
+void SparseComplexMatrix::finalize() {
+    if (not sorted) {// Only sort one time.
+        std::sort(triplet.begin(), triplet.end());  // Sort is O(N*log(N)) in time.
+            // Note that "sort()" implicitly uses the comparison operator<(t1,t2) defined before.
+        sorted = true; // Declare the vector "triplet" as sorted.
+    }
 }
 
 /*******************************************************************************
@@ -121,19 +188,20 @@ dcomplex SparseComplexMatrix::get(const int i, const int j) const {
 /**
  * Print essential information about the sparse matrix without showing the full content.
  */
-void SparseComplexMatrix::summary(const std::string& name) const {
-    std::cout << TAG_INFO << "Sparse complex matrix '" << name << "': Nrow=" << nrow << ", Ncol=" << ncol << ", Nnz=" << data.size() 
-              << ", Density=" << density() << "%, Symmetric=" << (isSymmetric() ? "true" : "false") << ".\n";
+void SparseComplexMatrix::printSummary(const std::string& name) const {
+    std::cout << TAG_INFO << "Sparse complex matrix '" << name << "': Nrow=" << nrow << ", Ncol=" << ncol << ", Nnz=" << triplet.size() 
+              << ", Density=" << 100.*density() << "%, Sorted=" << (sorted ? "true" : "false") 
+              << ", Symmetric=" << (isSymmetric() ? "true" : "false") << ".\n";
 }
 
 /**
- * Prints all the matrix elements to std output.
+ * Prints the vector of triplets to std output.
  */
 void SparseComplexMatrix::print(const std::string& name) const {
-    std::cout << TAG_INFO << name << " (" << nrow << "x" << ncol << ", nnz=" << data.size() 
-              << ", density=" << density() << "%) = [\n";
-    for (const auto& [id, elem] : data) {// Loop on the nonzero matrix elements.
-        std::cout << "\t(" << id.i << ", " << id.j << ") = " << elem.real() << (elem.imag() >= 0. ? "+" : "") << elem.imag() << "i\n";
+    std::cout << TAG_INFO << name << " (" << nrow << "x" << ncol << ", nnz=" << triplet.size() 
+              << ", density=" << 100.*density() << "%, sorted=" << (sorted ? "true" : "false") << ") = [\n";
+    for (const Triplet& t : triplet) {// Loop on the triplets.
+        std::cout << "\t" << t << "\n";
     }
     std::cout << "]" << std::endl;
 }
@@ -182,9 +250,9 @@ double SparseComplexMatrix::norm() const {
     
     double re, im, sumsq = 0.;
     
-    for (const auto& [id, elem] : data) {// Loop over the nonzero matrix elements.
-        re = elem.real();
-        im = elem.imag();
+    for (const Triplet& t : triplet) {// Loop over the triplets.
+        re = t.a.real();
+        im = t.a.imag();
         sumsq += re*re + im*im;
     }
     
@@ -197,10 +265,12 @@ double SparseComplexMatrix::norm() const {
 SparseComplexMatrix SparseComplexMatrix::conj() const {
     
     SparseComplexMatrix c(ncol, nrow);
+    c.allocate(triplet.size()); // Preallocate the matrix to speedup the construction (avoid reallocation).
     
-    for (const auto& [id, elem] : data) {// Loop over the matrix elements.
-        c(id.j, id.i) = std::conj(elem);
+    for (const Triplet& t : triplet) {// Loop over the triplets.
+        c(t.j, t.i) = std::conj(t.a);
     }
+    c.finalize();  // Ensure that the returned matrix has proper ordering.
     
     return c;
 }
@@ -210,19 +280,14 @@ SparseComplexMatrix SparseComplexMatrix::conj() const {
  */
 bool SparseComplexMatrix::isSymmetric() const {
     
-    if (nrow != ncol) {// If the matrix is non-square, then skip further calculations.
-        return false;
-    }
+    checkSorted("isSymmetric()"); // Check that the matrix is indeed sorted.
     
-    for (const auto& [id, elem] : data) {// Loop over the nonzero matrix elements.
-        if (id.i > id.j) {// If the element is in the lower triangle.
-            
-            auto p = data.find(Indices{id.j, id.i});  // Find the matrix element with permuted indices (j, i).
-            
-            if (p == data.end() || p->second != elem) {// If the symmetric element does not exist or is different, then return "false".
-                return false;
-            }
-        }
+    if (nrow != ncol) return false;  // If the matrix is non-square, then skip further calculations.
+    
+    Triplet test;
+    
+    for (const Triplet& t : triplet) {// Loop over the triplets.
+        if (t.i > t.j && get(t.j, t.i) != t.a) return false;
     }
     
     return true;
@@ -233,12 +298,13 @@ bool SparseComplexMatrix::isSymmetric() const {
  */
 SparseComplexMatrix operator*(const dcomplex scalar, const SparseComplexMatrix& a) {
     
-    SparseComplexMatrix b(a); // Copy constructor.
+    SparseComplexMatrix b(a.nrow, a.ncol);
+    b.allocate(a.triplet.size()); // Preallocate the matrix to speedup the construction (avoid reallocation).
     
-    for (auto& [id, elem] : b.data) {// Loop over the nonzero matrix elements of A.
-        //b(id.i, id.j) = scalar * elem;
-        elem *= scalar;
+    for (const Triplet& t : a.triplet) {// Loop on the triplets of A.
+        b(t.i, t.j) = scalar * t.a;
     }
+    b.finalize(); // Ensure the matrix "B" is sorted (it should be so in principle).
     
     return b;
 }
@@ -262,16 +328,15 @@ ComplexMatrix operator*(const SparseComplexMatrix& a, const ComplexMatrix& b) {
         throw std::invalid_argument(msg);
     }
     
-    ComplexMatrix c(a.nrow, b.getNcol());  // Declare a dense matrix C = A*B (initially zero).
+    ComplexMatrix c(a.nrow, b.getNcol());  // Declare a dense matrix (initially zero).
     
-    for (const auto& [id, elem] : a.data) {// Loop over the triplets of A.
+    for (const Triplet& t : a.triplet) {// Loop over the triplets of A.
         
         for (int k = 0; k < b.getNcol(); k++) {// Loop over the columns of B.
-            c(id.i, k) += elem * b(id.j, k);   // C_ik = Sum_j A_ij B_jk
+            c(t.i, k) += t.a * b(t.j, k);   // C_ik = Sum_j A_ij B_jk
         }
         
     }
-    
     return c;
 }
 
@@ -299,6 +364,8 @@ void checkSolverInput(const SparseComplexMatrix& a, const SparseComplexMatrix& b
                         + std::to_string(b.getNcol()) + " and X.ncol=" + std::to_string(x.getNcol()) + ".";
         throw std::invalid_argument(msg);
     }
+    a.checkSorted("solve*()");  // Check that the two sparse matrices are properly initialized (sorted).
+    b.checkSorted("solve*()");
 }
 
 /**
@@ -315,8 +382,10 @@ void solveUmfpack(const SparseComplexMatrix& a, const SparseComplexMatrix& b, Co
     // 1. First check for possible errors in the input:
     checkSolverInput(a, b, x);
     
-    // 2. Convert the matrix into UMFPACK's compressed column format (~1000 times faster than solving):
-    int32_t nnz = a.data.size();  // Estimate the number of nonzero (with/without symmetry).
+    auto start_conversion = std::chrono::steady_clock::now();
+    
+    // 2. Convert the matrix into UMFPACK's compressed column format:
+    int32_t nnz = a.triplet.size();  // Estimate the number of nonzero (with/without symmetry).
     auto pcol = new int32_t[a.ncol+1]();
     auto irow = new int32_t[nnz];
     auto real = new double[nnz];
@@ -325,20 +394,25 @@ void solveUmfpack(const SparseComplexMatrix& a, const SparseComplexMatrix& b, Co
     nnz = 0;  // Reset the number of nonzero to count them.
     int32_t jcol = 0;  // Current column index.
     
-    for (const auto& [id, elem] : a.data) {// Loop on the triplets in column-major order.
+    for (const Triplet& t : a.triplet) {// Loop on the triplets in column-major order.
         
-        if (id.j != jcol) {
-            jcol = id.j;
+        if (t.j != jcol) {
+            jcol = t.j;
             pcol[jcol] = nnz;
         }
-        irow[nnz] = id.i;
-        real[nnz] = elem.real();
-        imag[nnz] = elem.imag();
+        irow[nnz] = t.i;
+        real[nnz] = t.a.real();
+        imag[nnz] = t.a.imag();
         nnz++;
     }
     pcol[a.ncol] = nnz;
     
-    // 4. Call UMFPACK for each right-hand side (most time-consuming operation of the program):
+    double ctime_conversion = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_conversion).count();
+    std::cout << TAG_INFO << "solveUmfpack(): Conversion time = " << ctime_conversion << " s.\n";
+    
+    auto start_solution = std::chrono::steady_clock::now();
+    
+    // 4. Call UMFPACK for each right-hand side:
     double info[UMFPACK_INFO];  // Output information (including UMFPACK's returned value "status").
     double control[UMFPACK_CONTROL]; // UMFPACK's control parameters (input).
     umfpack_zi_defaults(control); // Setup the default UMFPACK parameters for complex arrays (and long indices).
@@ -388,6 +462,9 @@ void solveUmfpack(const SparseComplexMatrix& a, const SparseComplexMatrix& b, Co
     delete[] ximag;
     delete[] breal;
     delete[] bimag;
+    
+    double ctime_solution = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_solution).count();
+    std::cout << TAG_INFO << "solveUmfpack(): Solution time = " << ctime_solution << " s.\n";
 }
 
 /**
@@ -409,3 +486,4 @@ void solveMumps(const SparseComplexMatrix& a, const SparseComplexMatrix& b, Comp
     // TODO: See p.121 of MUMPS manual: https://mumps-solver.org/doc/userguide_5.8.1.pdf  ......................
     
 }
+

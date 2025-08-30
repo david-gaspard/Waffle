@@ -1,25 +1,28 @@
 /****
- * @date Created on 2025-08-27 at 14:43:49 CEST
+ * @date Created on 2025-08-29 at 13:16:10 CEST
  * @author David Gaspard (ORCID 0000-0002-4449-8782) <david.gaspard@espci.fr>
  * @copyright This program is distributed under the MIT License.
  * @file C++ header providing the SparseComplexMatrix class used to create and invert sparse complex matrices.
- * This object serves as an interface to UMFPACK and possibly other sparse linear solvers.
+ * This version is based on a vector of triplets and a final sort to accelerate the matrix filling.
  ***/
 #ifndef _SPARSE_COMPLEX_MATRIX_H
 #define _SPARSE_COMPLEX_MATRIX_H
 #include "ComplexMatrix.hpp"
-#include <map>
+#include <vector>
+#include <iostream>
 
 /**
- * Defines the indices of the sparse matrix.
- * Note that the indices (i, j) must be between (0, 0) and (nrow-1, ncol-1).
+ * Defines the element of a sparse complex matrix. This is known as the "triplet form".
  */
-struct Indices {
+struct Triplet {
     
-    int i;   // Row index of the element.
-    int j;   // Column index of the element.
+    int i;       // Row index of the element.
+    int j;       // Column index of the element.
+    dcomplex a;  // Matrix element.
     
 };
+
+std::ostream& operator<<(std::ostream& os, const Triplet& t);
 
 /**
  * Defines the SparseComplexMatrix object.
@@ -28,11 +31,10 @@ class SparseComplexMatrix {
     
     private: 
     
-    std::map<Indices, dcomplex> data;  // List of matrix elements stored in column-major ordering.
-        // Note: Maps ensure that search, insertion, and removal operations have logarithmic complexity O(log(N)),
-        // and are thus much more efficient than Vectors for very large N. Maps greatly improve the construction speed of the sparse matrix.
+    std::vector<Triplet> triplet;  // Defines the list of triplets. Note that this vector is always sorted.
     int nrow;       // Number of rows of the sparse matrix.
     int ncol;       // Number of columns of the sparse matrix.
+    bool sorted;    // Flag indicating if the sparse matrix is sorted by finalize() method.
     
     public:
     
@@ -43,9 +45,17 @@ class SparseComplexMatrix {
     int getNrow() const;
     int getNcol() const;
     int64_t getNnz() const;
+    double density() const;
+    void checkSorted(const std::string& name) const;
+    void allocate(const int nnz);
     dcomplex& operator()(const int i, const int j);
     dcomplex get(const int i, const int j) const;
-    double density() const;
+    void finalize();
+    
+    // Print methods:
+    void printSummary(const std::string& name) const;
+    void print(const std::string& name) const;
+    void saveImage(const std::string& filename) const;
     
     // Mathematical operations:
     double norm() const;
@@ -55,11 +65,6 @@ class SparseComplexMatrix {
     friend SparseComplexMatrix operator*(const SparseComplexMatrix& a, const dcomplex scalar);
     friend ComplexMatrix operator*(const SparseComplexMatrix& a, const ComplexMatrix& b);
     friend void solveUmfpack(const SparseComplexMatrix& a, const SparseComplexMatrix& b, ComplexMatrix& x);
-    
-    // Print methods:
-    void summary(const std::string& name) const;
-    void print(const std::string& name) const;
-    void saveImage(const std::string& filename) const;
     
     // Private computational methods:
     private:

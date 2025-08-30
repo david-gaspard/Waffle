@@ -15,7 +15,7 @@
  * DONE: (3)  In WaveSystem: Check in doing math that the normalization of transmission eigenstates is correct.
  * DONE: (4)  Calculate the condition number of the "hamiltonian" for a waveguide by estimating the lowest eigenstate. 
  *            This would indicate whether using iterative methods (instead of direct solvers) is relevant or not...
- * DONE: (5)  In SparseComplexMatrix: Try to optimize the construction of the Hamiltonian.
+ * REDO: (5)  In SparseComplexMatrix: Try to optimize the construction of the Hamiltonian.
  *            Check if there is a faster object than "vector" for insertion:
  *            - See "map" (binary tree): faster for insertion than "vector" (no realloc), faster for accessing by key, slower for traversal (no direct linkage).
  *              Probably most appropriate choice if and only if traversal is not too slow compared to "vector".

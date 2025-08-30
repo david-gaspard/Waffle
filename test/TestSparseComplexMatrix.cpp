@@ -11,7 +11,7 @@
  * Print generic informations about the matrix.
  */
 void printInfoMatrix(const std::string& name, const SparseComplexMatrix& a) {
-    a.summary(name);
+    a.printSummary(name);
     a.print(name);
 }
 
@@ -25,6 +25,7 @@ int testFilling1() {
     
     matrix(2, 1) = dcomplex(1., 2.);
     matrix(4, 0) = dcomplex(3., 4.);
+    matrix.finalize();
     
     std::cout << TAG_INFO << "matrix.getNrow = " << matrix.getNrow() << "\n";
     std::cout << TAG_INFO << "matrix.getNcol = " << matrix.getNcol() << "\n";
@@ -48,14 +49,18 @@ int testFilling2() {
     std::cout << "====== SPARSE COMPLEX MATRIX - TEST FILLING #2 ======" << std::endl;
     
     const int n = 5;
+    dcomplex elem;
     SparseComplexMatrix matrix(n, n);
     
     for (int i = 0; i < n; i++) {
-        for (int j = 0; j <= i; j++) {// Loop over the lower triangle.
-            matrix(i, j) = dcomplex(i + 2*j, j - 2*i);
-            matrix(j, i) = matrix(i, j);
+        matrix(i, i) = dcomplex(3*i, -i);
+        for (int j = 0; j < i; j++) {// Loop over the lower triangle.
+            dcomplex elem = dcomplex(i + 2*j, j - 2*i);
+            matrix(i, j) = elem;
+            matrix(j, i) = elem;
         }
     }
+    matrix.finalize();
     printInfoMatrix("Matrix", matrix);
     
     return 0;
@@ -71,6 +76,7 @@ int testHybridProduct() {
     a(0, 0) = 2;   a(1, 0) = 3;  a(0, 1) = 3;
     a(2, 1) = -1;  a(4, 1) = 4;  a(1, 2) = 4;
     a(2, 2) = -3;  a(3, 2) = 1;  a(4, 2) = 2;
+    a.finalize();
     
     ComplexMatrix b(3, 2);
     b(0, 0) = 1;  b(0, 1) = 4;
@@ -101,14 +107,15 @@ int testSolveUmfpack1() {
     
     const int n = 5;
     SparseComplexMatrix a(n, n);
-    
     a(0, 0) = 2;   a(1, 0) = 3;  a(0, 1) = 3;  a(2, 1) = -1;  a(4, 1) = 4;  a(1, 2) = 4;
     a(2, 2) = -3;  a(3, 2) = 1;  a(4, 2) = 2;  a(2, 3) = 2;   a(1, 4) = 6;  a(4, 4) = 1;
+    a.finalize();
     
     //printInfoMatrix("A", a);
     
     SparseComplexMatrix b(n, 1);
     b(0, 0) = 8;  b(1, 0) = 45;  b(2, 0) = -3;  b(3, 0) = 3;  b(4, 0) = 19; 
+    b.finalize();
     
     ComplexMatrix x(n, 1), x_expc(n, 1);
     x_expc(0, 0) = 1;  x_expc(1, 0) = 2;  x_expc(2, 0) = 3;  x_expc(3, 0) = 4;  x_expc(4, 0) = 5;
@@ -131,14 +138,15 @@ int testSolveUmfpack2() {
     
     const int n = 5;
     SparseComplexMatrix a(n, n);
-    
     a(0, 0) = 2;  a(1, 0) = 6;  a(0, 1) = 6;  a(2, 1) =  3;  a(4, 1) = 10;  a(1, 2) = 3;  a(2, 2) = -3;
     a(3, 2) = 3;  a(4, 2) = 2;  a(2, 3) = 3;  a(1, 4) = 10;  a(2, 4) =  2;  a(4, 4) = 1;
+    a.finalize();
     
     //printInfoMatrix("A", a);
     
     SparseComplexMatrix b(n, 1);
     b(0, 0) = 14;  b(1, 0) = 65;  b(2, 0) = 19;  b(3, 0) = 9;  b(4, 0) = 31;
+    b.finalize();
     
     ComplexMatrix x(n, 1), x_expc(n, 1);
     x_expc(0, 0) = 1;  x_expc(1, 0) = 2;  x_expc(2, 0) = 3;  x_expc(3, 0) = 4;  x_expc(4, 0) = 5;
@@ -162,7 +170,6 @@ int testSolveUmfpack3() {
     // 1. Prepare matrix 'A':
     const int n = 5;
     SparseComplexMatrix a(n, n);
-    
     a(0, 0) = dcomplex(2, -1);
     a(0, 1) = dcomplex(3, 2);
     a(1, 2) = dcomplex(5, -7);
@@ -175,6 +182,7 @@ int testSolveUmfpack3() {
     a(4, 1) = dcomplex(4, 3);
     a(4, 2) = dcomplex(-2, -1);
     a(4, 4) = dcomplex(-1, 5);
+    a.finalize();
     
     //printInfoMatrix("A", a);
     
@@ -185,6 +193,7 @@ int testSolveUmfpack3() {
     b(2, 0) = dcomplex( -3,  -4);  b(2, 1) = dcomplex(-13, -14);  b(2, 2) = dcomplex( -3,  -2);
     b(3, 0) = dcomplex(  3,   7);  b(3, 1) = dcomplex(  8,  22);  b(3, 2) = dcomplex(  1,   3);
     b(4, 0) = dcomplex( -3,  28);  b(4, 1) = dcomplex(  2,  63);  b(4, 2) = dcomplex( -3,   4);
+    b.finalize();
     
     // 3. Prepare expected solution 'x_expc':
     ComplexMatrix x(n, 3), x_expc(n, 3);

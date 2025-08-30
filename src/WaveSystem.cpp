@@ -199,7 +199,7 @@ void WaveSystem::printSummary() const {
  * Prints essential information about the sparse Hamiltonian matrix.
  */
 void WaveSystem::infoHamiltonian() const {
-    hamiltonian.summary("Hamiltonian");
+    hamiltonian.printSummary("Hamiltonian");
 }
 
 /**
@@ -375,7 +375,15 @@ void WaveSystem::computeHamiltonian() {
     MeshPoint p;
     dcomplex kh2 = dcomplex(kh*kh, MEPS);
     
-    // 1. Construct the bulk part of the Hamiltonian (Hermitian part) :
+    const auto start = std::chrono::steady_clock::now(); // Gets the current time.
+    
+    // 1. Preallocate the sparse Hamiltonian with an accurate estimate of the number of nonzero elements:
+    //const int nnzub = ...
+    //hamiltonian.allocate(nnzub);
+    
+    // TODO: Find a tight upper bound on "nnz" and check the speedup...................................................
+    
+    // 2. Construct the bulk part of the Hamiltonian (Hermitian part) :
     int np, i, j;
     
     for (i = 0; i < npoint; i++) {//Loop over the points of the mesh.
@@ -395,13 +403,21 @@ void WaveSystem::computeHamiltonian() {
         }
     }
     
-    // 2. Construct the part of the Hamiltonian in the openings (open boundary conditions) :
+    double ctime_bulk = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
+    std::cout << TAG_INFO << "Hamiltonian bulk computed in " << ctime_bulk << " s.\n";
+    
+    // 3. Construct the part of the Hamiltonian in the openings (open boundary conditions) :
     std::vector<Opening> opening = mesh.getOpening();  // Extract the openings from the mesh.
     
-    for (Opening op : opening) {// Loop over openings.
+    for (const Opening& op : opening) {// Loop over openings.
+        
+        auto start_opening_matrix = std::chrono::steady_clock::now();
         
         np = op.index.size();  // Number of points involved in the opening "op".
         ComplexMatrix opmat = openingMatrix(kh2, np);  // Get the opening matrix, -1 + i*sqrt(kh^2 + D2), where D2 is the Laplacian matrix.
+        
+        double ctime_opening_matrix = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_opening_matrix).count();
+        std::cout << TAG_INFO << "Opening matrix computed in " << ctime_opening_matrix << " s.\n";
         
         for (i = 0; i < np; i++) {// Loop on the points in the opening.
             
@@ -421,6 +437,16 @@ void WaveSystem::computeHamiltonian() {
             }
         }
     }
+    
+    double ctime_opening = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count() - ctime_bulk;
+    std::cout << TAG_INFO << "Hamiltonian opening computed in " << ctime_opening << " s.\n";
+    
+    // 4. Finalize the sparse Hamiltonian (sort the matrix elements in column-major ordering):
+    hamiltonian.finalize();
+    //hamiltonian.printSummary("Hamiltonian");
+    
+    double ctime_total = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
+    std::cout << TAG_INFO << "Hamiltonian total computed in " << ctime_total << " s.\n";
 }
 
 /**
@@ -454,7 +480,7 @@ void WaveSystem::setDisorder(const uint64_t seed) {
  * Compute the input and output matrices containing the input and output modes.
  */
 void WaveSystem::computeIOStates() {
-    //std::cout << TAG_INFO << "Computing the input/output states...\n";
+    std::cout << TAG_INFO << "Computing the input/output states...\n";
     
     // Construct the input/output modes :
     dcomplex kh2 = dcomplex(kh*kh, MEPS);
@@ -468,6 +494,8 @@ void WaveSystem::computeIOStates() {
     dosoutput = 0.;  // Initialize the density of states in the output lead(s).
     ninputprop = 0;  // Initialize the number of propagating input modes.
     noutputprop = 0; // Initialize the number of propagating output modes.
+    
+    const auto start = std::chrono::steady_clock::now(); // Gets the current time.
     
     for (Opening op : mesh.getOpening()) {
         
@@ -512,6 +540,13 @@ void WaveSystem::computeIOStates() {
             }
         }
     }
+    
+    // Finalize the sparse matrices (sort the elements):
+    inputState.finalize();
+    outputState.finalize();
+    
+    double ctime = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
+    std::cout << TAG_INFO << "Input/Output States computed in " << ctime << " s.\n";
     
     // Normalize the density of states:
     dosinput  /= 2*PI*ninput;
