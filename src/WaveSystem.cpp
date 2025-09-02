@@ -370,18 +370,15 @@ void WaveSystem::plotTransmissionStates() {
  * Creates the free part of the "Hamiltonian", (d_x^2 + d_y^2 + k^2) * h^2, and store the result within the present WaveSystem object.
  */
 void WaveSystem::computeHamiltonian() {
-    std::cout << TAG_INFO << "Building the Hamiltonian...\n";
+    std::cout << TAG_INFO << "Building the Hamiltonian... ";
+    const auto start_build = std::chrono::steady_clock::now(); // Gets the current time.
     
     MeshPoint p;
     dcomplex kh2 = dcomplex(kh*kh, MEPS);
     
-    const auto start = std::chrono::steady_clock::now(); // Gets the current time.
-    
     // 1. Preallocate the sparse Hamiltonian with an accurate estimate of the number of nonzero elements:
-    //const int nnzub = ...
+    //const int nnzub = ... // TODO: Find a tight upper bound on "nnz" and check the speedup......
     //hamiltonian.allocate(nnzub);
-    
-    // TODO: Find a tight upper bound on "nnz" and check the speedup...................................................
     
     // 2. Construct the bulk part of the Hamiltonian (Hermitian part) :
     int np, i, j;
@@ -394,7 +391,7 @@ void WaveSystem::computeHamiltonian() {
             
             hamiltonian(i, i) = -4. + kh2;  // Add the diagonal element of the Hamiltonian H(i, i) = -4 + (k*h)^2.
             
-            for (Direction dir : allDirections) {// Loop over all directions.
+            for (const Direction dir : allDirections) {// Loop over all directions.
                 j = p.neighbor(dir);  // Extract the index of the neighboring point.
                 if (j >= 0) {// If the neigbhoring point is in the mesh, then add H(i, j) = 1.
                     hamiltonian(i, j) = 1.;
@@ -403,21 +400,11 @@ void WaveSystem::computeHamiltonian() {
         }
     }
     
-    double ctime_bulk = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
-    std::cout << TAG_INFO << "Hamiltonian bulk computed in " << ctime_bulk << " s.\n";
-    
     // 3. Construct the part of the Hamiltonian in the openings (open boundary conditions) :
-    std::vector<Opening> opening = mesh.getOpening();  // Extract the openings from the mesh.
-    
-    for (const Opening& op : opening) {// Loop over openings.
-        
-        auto start_opening_matrix = std::chrono::steady_clock::now();
+    for (const Opening& op : mesh.getOpening()) {// Loop over the openings of the mesh.
         
         np = op.index.size();  // Number of points involved in the opening "op".
         ComplexMatrix opmat = openingMatrix(kh2, np);  // Get the opening matrix, -1 + i*sqrt(kh^2 + D2), where D2 is the Laplacian matrix.
-        
-        double ctime_opening_matrix = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_opening_matrix).count();
-        std::cout << TAG_INFO << "Opening matrix computed in " << ctime_opening_matrix << " s.\n";
         
         for (i = 0; i < np; i++) {// Loop on the points in the opening.
             
@@ -427,7 +414,7 @@ void WaveSystem::computeHamiltonian() {
             
             p = mesh.getPoint(op.index.at(i)); // Get the current point p(i) in the opening.
             
-            for (Direction dir : allDirections) {// Loop over the directions.
+            for (const Direction dir : allDirections) {// Loop over the directions.
                 
                 j = p.neighbor(dir);
                 
@@ -438,15 +425,12 @@ void WaveSystem::computeHamiltonian() {
         }
     }
     
-    double ctime_opening = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count() - ctime_bulk;
-    std::cout << TAG_INFO << "Hamiltonian opening computed in " << ctime_opening << " s.\n";
-    
     // 4. Finalize the sparse Hamiltonian (sort the matrix elements in column-major ordering):
     hamiltonian.finalize();
-    //hamiltonian.printSummary("Hamiltonian");
     
-    double ctime_total = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
-    std::cout << TAG_INFO << "Hamiltonian total computed in " << ctime_total << " s.\n";
+    // Measure the build time for information:
+    double ctime_build = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_build).count();
+    std::cout << "Done in " << ctime_build << " s.\n";
 }
 
 /**
@@ -480,7 +464,8 @@ void WaveSystem::setDisorder(const uint64_t seed) {
  * Compute the input and output matrices containing the input and output modes.
  */
 void WaveSystem::computeIOStates() {
-    std::cout << TAG_INFO << "Computing the input/output states...\n";
+    std::cout << TAG_INFO << "Building the input/output states... ";
+    const auto start_build = std::chrono::steady_clock::now(); // Gets the current time.
     
     // Construct the input/output modes :
     dcomplex kh2 = dcomplex(kh*kh, MEPS);
@@ -495,9 +480,7 @@ void WaveSystem::computeIOStates() {
     ninputprop = 0;  // Initialize the number of propagating input modes.
     noutputprop = 0; // Initialize the number of propagating output modes.
     
-    const auto start = std::chrono::steady_clock::now(); // Gets the current time.
-    
-    for (Opening op : mesh.getOpening()) {
+    for (const Opening& op : mesh.getOpening()) {
         
         if (op.bndtype == BND_INPUT) {// If the opening is an input, then construct the modes.
             
@@ -545,9 +528,6 @@ void WaveSystem::computeIOStates() {
     inputState.finalize();
     outputState.finalize();
     
-    double ctime = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
-    std::cout << TAG_INFO << "Input/Output States computed in " << ctime << " s.\n";
-    
     // Normalize the density of states:
     dosinput  /= 2*PI*ninput;
     dosoutput /= 2*PI*noutput;
@@ -555,6 +535,10 @@ void WaveSystem::computeIOStates() {
     // Compute the exact free density of states on a square lattice:
     const double khm4 = 4. - kh*kh;
     dosfree = (2./(PI*PI*khm4)) * ellipticK( kh*kh*(kh*kh - 8.)/(khm4*khm4) );
+    
+    // Measure the build time for information:
+    double ctime_build = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_build).count();
+    std::cout << "Done in " << ctime_build << " s.\n";
 }
 
 /**

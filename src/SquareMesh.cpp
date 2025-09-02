@@ -14,8 +14,9 @@
  * Constructor of the Square Mesh object.
  */
 SquareMesh::SquareMesh() {
-    std::cout << TAG_INFO << "Creating SquareMesh...\n";
+    std::cout << TAG_INFO << "Creating SquareMesh... ";
     ready = false;
+    start_build = std::chrono::steady_clock::now(); // Measure time from SquareMesh creation (for information only).
 }
 
 /**
@@ -424,9 +425,13 @@ void SquareMesh::computeOpening() {
  */
 void SquareMesh::finalize() {
     if (not ready) {// Only finalize one time.
+        
         fixNeighbors(); // Fix the neighbors, O(N*log(N)).
         computeOpening(); // Compute the openings, ~O(N).
         ready = true; // The SquareMesh gets ready for computations.
+        
+        double ctime_build = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_build).count();
+        std::cout << "Done in " << ctime_build << " s.\n";
     }
 }
 

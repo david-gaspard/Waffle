@@ -5,6 +5,7 @@
  * @file C++ code providing tests for the ComplexMatrix class.
  ***/
 #include "ComplexMatrix.hpp"
+#include <chrono>
 #include <iostream>
 
 /**
@@ -176,7 +177,7 @@ int testApply() {
 int testModalMatrix() {
     std::cout << "====== TEST MODAL MATRIX ======" << std::endl;
     
-    const int n = 7;
+    const int n = 6;
     
     ComplexMatrix u = modalMatrix(n);
     
@@ -193,14 +194,27 @@ int testModalMatrix() {
 int testOpeningMatrix() {
     std::cout << "====== TEST OPENING MATRIX ======" << std::endl;
     
-    const int n = 7;
+    const int n = 300;
     const double kh = PI/2.;
+    
+    auto start_build_old = std::chrono::steady_clock::now();
+    
+    ComplexMatrix a_old = openingMatrix_old(dcomplex(kh*kh, MEPS), n);
+    
+    double ctime_build_old = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_build_old).count();
+    std::cout << TAG_INFO << "Build time (old) = " << ctime_build_old << " s.\n";
+    
+    auto start_build_new = std::chrono::steady_clock::now();
     
     ComplexMatrix a = openingMatrix(dcomplex(kh*kh, MEPS), n);
     
-    a.print("Opening matrix A");
+    double ctime_build_new = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_build_new).count();
+    std::cout << TAG_INFO << "Build time (new) = " << ctime_build_new << " s. Speedup = " << ctime_build_old/ctime_build_new << ".\n";
     
-    //std::cout << TAG_INFO << "Unitarity (U*U - 1) = " << (u*u - identityMatrix(n)).norm() << std::endl;
+    //a_old.print("Opening matrix A (old)");
+    //a.print("Opening matrix A");
+    
+    std::cout << TAG_INFO << "Error (A - A_old) = " << (a - a_old).norm() << std::endl;
     
     return 0;
 }

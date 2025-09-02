@@ -9,6 +9,7 @@
 #include "Constants.hpp"
 #include "MeshPoint.hpp"
 #include "Vector2D.hpp"
+#include <chrono>
 
 /**
  * Defines an opening, i.e., an alignment of nearest-neighboring points with an open boundary condition ("open", "input", or "output") in the same direction.
@@ -35,6 +36,7 @@ class SquareMesh {
                                    // No distinction between "open", "input", and "output" boundary conditions, i.e., they are gathered in the same opening.
     
     bool ready;  // True when the SquareMesh is ready for computations. False, otherwise. This boolean becomes True after finalize() is called.
+    std::chrono::time_point<std::chrono::steady_clock> start_build; // Time point at which the square mesh is built.
     
     public:
     

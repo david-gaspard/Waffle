@@ -59,5 +59,6 @@ ComplexMatrix gaussianRandomMatrix(const int nrow, const int ncol, const double 
 double laplacianEigenvalue(const int i, const int n);
 ComplexMatrix modalMatrix(const int n);
 ComplexMatrix openingMatrix(const dcomplex kh2, const int n);
+ComplexMatrix openingMatrix_old(const dcomplex kh2, const int n);
 
 #endif

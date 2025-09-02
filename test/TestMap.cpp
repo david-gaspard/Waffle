@@ -132,12 +132,12 @@ double speedInsertListSort(const uint32_t nmax, const bool verbose) {
         ls.push_back(p);
     }
     
-    double ctime = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count()/1e6;
+    double ctime = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
     std::cout << TAG_INFO << "Insertion = " << ctime << " s.\n";
     
     ls.sort(compareKey);
     
-    ctime = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count()/1e6 - ctime;
+    ctime = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count() - ctime;
     
     std::cout << TAG_INFO << "Sort = " << ctime << " s.\n";
     
@@ -170,13 +170,13 @@ double speedInsertVectorSort(const uint32_t nmax, const bool verbose) {
         v.push_back(p);
     }
     
-    double ctime = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count()/1e6;
+    double ctime = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
     std::cout << TAG_INFO << "Insertion = " << ctime << " s.\n";
     
     //v.sort(compareKey);
     std::sort(v.begin(), v.end(), compareKey);
     
-    ctime = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count()/1e6 - ctime;
+    ctime = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count() - ctime;
     
     std::cout << TAG_INFO << "Sort = " << ctime << " s.\n";
     

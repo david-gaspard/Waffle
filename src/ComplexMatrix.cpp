@@ -595,6 +595,26 @@ ComplexMatrix modalMatrix(const int n) {
  */
 ComplexMatrix openingMatrix(const dcomplex kh2, const int n) {
     
+    ComplexMatrix u = modalMatrix(n); // Generate the modal matrix. Time: O(N^2/2).
+    ComplexMatrix opev(n, 1); // Computes the eigenvalues of the opening matrix.
+    dcomplex d2ev;
+    
+    for (int i = 0; i < n; i++) {// Loop over the rows of "opev".
+        d2ev = laplacianEigenvalue(i, n);  // Eigenvalue of the Laplacian matrix = -4*sin((i+1)*pi/(2*(n+1)))^2.
+        // Eigenvalue of the opening matrix, -exp(-i*K_x) where K_x = 2*arcsin(sqrt(kh2 + d2ev)/2) :
+        opev(i, 0) = -1. + (kh2 + d2ev)/2. + I*std::sqrt( (kh2 + d2ev) * (1. - (kh2 + d2ev)/4.) );
+    }
+    
+    return u * diagmul(opev, u); // Multiplies the modal matrices together and returns. Time: O(N^3).
+}
+
+/**
+ * Old version of the opening matrix generator.
+ * 
+ * @deprecated This version of the opening matrix generator is very slow. It is only used for testing.
+ */
+ComplexMatrix openingMatrix_old(const dcomplex kh2, const int n) {
+    
     ComplexMatrix a(n, n);
     dcomplex elem, d2ev, opev;
     

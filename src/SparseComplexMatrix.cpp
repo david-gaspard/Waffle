@@ -382,7 +382,7 @@ void solveUmfpack(const SparseComplexMatrix& a, const SparseComplexMatrix& b, Co
     // 1. First check for possible errors in the input:
     checkSolverInput(a, b, x);
     
-    auto start_conversion = std::chrono::steady_clock::now();
+    //auto start_conversion = std::chrono::steady_clock::now();
     
     // 2. Convert the matrix into UMFPACK's compressed column format:
     int32_t nnz = a.triplet.size();  // Estimate the number of nonzero (with/without symmetry).
@@ -407,10 +407,9 @@ void solveUmfpack(const SparseComplexMatrix& a, const SparseComplexMatrix& b, Co
     }
     pcol[a.ncol] = nnz;
     
-    double ctime_conversion = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_conversion).count();
-    std::cout << TAG_INFO << "solveUmfpack(): Conversion time = " << ctime_conversion << " s.\n";
-    
-    auto start_solution = std::chrono::steady_clock::now();
+    //double ctime_conversion = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_conversion).count();
+    //std::cout << TAG_INFO << "solveUmfpack(): Conversion time = " << ctime_conversion << " s.\n";
+    //auto start_solution = std::chrono::steady_clock::now();
     
     // 4. Call UMFPACK for each right-hand side:
     double info[UMFPACK_INFO];  // Output information (including UMFPACK's returned value "status").
@@ -463,8 +462,8 @@ void solveUmfpack(const SparseComplexMatrix& a, const SparseComplexMatrix& b, Co
     delete[] breal;
     delete[] bimag;
     
-    double ctime_solution = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_solution).count();
-    std::cout << TAG_INFO << "solveUmfpack(): Solution time = " << ctime_solution << " s.\n";
+    //double ctime_solution = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_solution).count();
+    //std::cout << TAG_INFO << "solveUmfpack(): Solution time = " << ctime_solution << " s.\n";
 }
 
 /**
