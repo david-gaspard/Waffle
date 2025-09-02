@@ -605,6 +605,34 @@ void WaveSystem::reflectionMatrix(ComplexMatrix& rmat) {
 }
 
 /**
+ * Check that the residual of the solution of the linear system is reasonably close to zero.
+ */
+void WaveSystem::checkResidual() {
+    
+    computeGreenFunction();  // Ensure that the Green function has been computed (this does nothing if it is so).
+    const ComplexMatrix inputState_product = hamiltonian * green; // Recompute the input state from the solution of the linear system.
+    
+    // Compare the matrices elementwise:
+    const double tol = 1e-11; // Tolerance over the relative error (elementwise).
+    double res, res_total = 0.;
+    dcomplex elem, elem_expc;
+    
+    for (int i = 0; i < npoint; i++) {// Loop over the mesh points.
+        for (int j = 0; j < ninput; j++) {// Loop over the input modes.
+            elem = inputState_product(i, j);
+            elem_expc = inputState.get(i, j);
+            res = std::abs(elem - elem_expc);
+            res_total += res;
+            if (res > tol*(std::abs(elem_expc) + 1.)) {// If the residual is two large.
+                std::cout << TAG_WARN << "Matrix element (" << i << ", " << j << ") is "
+                          << elem << ", expected " << elem_expc << " (diff=" << res << ").\n";
+            }
+        }
+    }
+    std::cout << TAG_INFO << "Total residual = " << res_total << ".\n";
+}
+
+/**
  * Check the unitary of the propagation, i.e., check that in the absence of absorption, the relation associated to probability conservation,
  * t*t.conj() + r*r.conj() = identityMatrix(), is verified. This method does the checking for several realizations of the disorder (number "nseed").
  * This method is mainly used for testing purposes.

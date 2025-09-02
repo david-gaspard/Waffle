@@ -9,7 +9,7 @@
 #include <iomanip>
 
 /**
- * @todo TODO:
+ * @todo TODO LIST:
  * DONE: (1)  In WaveSystem: If possible, compute the exact expression of the free DOS on a square lattice. It is used in setDisorder()...
  * DONE: (2)  In Waffle/Usador: Make the figures for Arthur (see below)...
  * DONE: (3)  In WaveSystem: Check in doing math that the normalization of transmission eigenstates is correct.
@@ -24,15 +24,17 @@
  * DONE: (6)  Note that if binary trees are indeed faster for sorted insertion/deletion, then "set" would be more appropriate for the points in SquareMesh...
  * DONE: (7)  In Main: Add histogram of transmission eigenvalues. Simply save all raw eigenvalues in a CSV file (each row per disorder realization)...
  * DONE: (8)  Write "plot_histo.py" to plot the histogram of a list of values in given interval [Tmin, Tmax] using Nbins.
- * (9)  In WaveSystem: Add checkResidual() to verify that the linear system is correctly solved...
- * (10) In Main: Add parallelized taskTransmissionOMP()...
- * DONE: (11) In plot_map.py: Fix the partial read bug with the CSV reader which occurs when it is called by the C++ program...
- * (12) Create script "plot_cut.py" to plot the intensity profile along a cut. A straight line should do the job...
- * (13) In SquareMesh: Create addImage(filename) to import PNG in order to facilitate the mesh creation...
- * (14) In SparseComplexMatrix: Improve plotImage() to export directly a PNG image instead of a heavy PPM file.
- * (15) Do no forget to implement the absorption (holabso != 0) using complex wavenumbers.
+ * DONE: (9)  In WaveSystem: Add checkResidual() to verify that the linear system is correctly solved...
+ * (10) In WaveSystem: Maybe remove the evanescent modes from "inputState" and "outputState" because they always give zero transmission eigenvalues...
+ * (11) In SparseComplexMatrix: Implement solveMumps() and compare with solveUmfpack()...
+ * (12) In Main: Add parallelized taskTransmissionOMP()...
+ * DONE: (13) In plot_map.py: Fix the partial read bug with the CSV reader which occurs when it is called by the C++ program...
+ * (14) Create script "plot_cut.py" to plot the intensity profile along a cut. A straight line should do the job...
+ * (15) In SquareMesh: Create addImage(filename) to import PNG in order to facilitate the mesh creation...
+ * (16) In SparseComplexMatrix: Improve plotImage() to export directly a PNG image instead of a heavy PPM file.
+ * (17) Do no forget to implement the absorption (holabso != 0) using complex wavenumbers.
  *      Check that the implementation is correct, maybe using the Green function, or the distribution rho(T) (which should match RecurGreen's results)...
- * DONE: (16) In all plot scripts: Extract the header of the CSV file and copy it into the "title" of pgfplots' "axis" environment.
+ * DONE: (18) In all plot scripts: Extract the header of the CSV file and copy it into the "title" of pgfplots' "axis" environment.
  */
 
 /**
@@ -495,21 +497,22 @@ int main(int argc, char** argv) {
     //Context ctx = createDoubleWaveguide2();
     
     ctx.sys.printSummary();
+    
+    // Checking operations:
+    //ctx.sys.setDisorder(1);
+    ctx.sys.checkResidual();
+    ctx.sys.checkUnitarity(false);
     //ctx.sys.infoHamiltonian();
     //ctx.sys.plotMesh();
     //ctx.sys.plotInputState();
     //ctx.sys.plotOutputState();
     //ctx.sys.plotHamiltonian();
     //ctx.sys.plotGreenFunction();
-    //ctx.sys.checkUnitarity(true);
-    
-    //ctx.sys.setDisorder(1);
-    //ctx.sys.plotGreenFunction();
     //ctx.sys.plotTransmissionStates();
     
-    const int nseed = 1; // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
+    //const int nseed = 1; // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
     
-    taskTransmissionSerial(ctx.sys, ctx.trange, nseed);
+    //taskTransmissionSerial(ctx.sys, ctx.trange, nseed);
     //taskTransmissionOMP(ctx.sys, ctx.trange, nseed);
     
     return 0;

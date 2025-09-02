@@ -84,6 +84,7 @@ class WaveSystem {
     void transmissionMatrix(ComplexMatrix& tmat);
     void reflectionMatrix(ComplexMatrix& rmat);
     void checkUnitarity(const bool showtval);
+    void checkResidual();
     void transmissionStates(ComplexMatrix& tstate, RealMatrix& tval);
     void transmissionProfiles(const RealMatrix& trange, RealMatrix& tprofile, RealMatrix& nsample, RealMatrix& tval);
     
