@@ -25,8 +25,11 @@
  * DONE: (7)  In Main: Add histogram of transmission eigenvalues. Simply save all raw eigenvalues in a CSV file (each row per disorder realization)...
  * DONE: (8)  Write "plot_histo.py" to plot the histogram of a list of values in given interval [Tmin, Tmax] using Nbins.
  * DONE: (9)  In WaveSystem: Add checkResidual() to verify that the linear system is correctly solved...
+ * 
  * (10) In WaveSystem: Maybe remove the evanescent modes from "inputState" and "outputState" because they always give zero transmission eigenvalues...
- * (11) In SparseComplexMatrix: Implement solveMumps() and compare with solveUmfpack()...
+ * 
+ * 
+ * (11) In SparseComplexMatrix: Implement solveMumps() (with nested dissection, but no iterative refinement) and compare performance with solveUmfpack()...
  * (12) In Main: Add parallelized taskTransmissionOMP()...
  * DONE: (13) In plot_map.py: Fix the partial read bug with the CSV reader which occurs when it is called by the C++ program...
  * (14) Create script "plot_cut.py" to plot the intensity profile along a cut. A straight line should do the job...
@@ -373,8 +376,8 @@ void plotTProfile(const RealMatrix& tprofile, const RealMatrix& trange, const Re
     // 1. First compute some metadata:
     const int nseed = tvalstore.getNrow();
     const int nprofile = tprofile.getNcol();
-    const int nprop = std::min(sys.getNInputProp(), sys.getNOutputProp());  // Get the number of propagationg modes (nonzero transmission eigenvalues).
-    const double tavg = tvalstore.sum()/(nprop*static_cast<double>(nseed));  // Compute the average transmission probability.
+    const int ntval = std::min(sys.getNInputProp(), sys.getNOutputProp());  // Get the number of propagationg modes (nonzero transmission eigenvalues).
+    const double tavg = tvalstore.sum()/(ntval*static_cast<double>(nseed));  // Compute the average transmission probability.
     const double dscat_eff = (PI/2.) * (1./tavg - 1.);   // Deduce the effective scattering depth (as if in a waveguide).
     
     // 2. Save the transmission eigenstate profiles to a file and plot them:
@@ -398,13 +401,13 @@ void plotTProfile(const RealMatrix& tprofile, const RealMatrix& trange, const Re
 void plotHistogram(const RealMatrix& tvalstore, const WaveSystem& sys, const double ctime) {
     
     const int nseed = tvalstore.getNrow();  // Number of realizations of the disorder.
-    const int nprop = tvalstore.getNcol();  // Number of nonzero eigenvalues (also the number of propagating modes).
-    const double tavg = tvalstore.sum()/(nprop*static_cast<double>(nseed));  // Compute the average transmission probability.
+    const int ntval = tvalstore.getNcol();  // Number of nonzero eigenvalues (also the number of propagating modes).
+    const double tavg = tvalstore.sum()/(ntval*static_cast<double>(nseed));  // Compute the average transmission probability.
     const double dscat_eff = (PI/2.) * (1./tavg - 1.);   // Deduce the effective scattering depth (as if in a waveguide).
     const char* sep = ", ";  // Separator used between entries of the CSV file.
     const int prec = 16;     // Precision used in printing double precision values.
     const std::string filename = sys.uniqueFile("tspectrum", ".csv");
-    const double fsize = (prec+4.) * nprop * static_cast<double>(nseed);  // Roughly estimated file size in bytes (octets).
+    const double fsize = (prec+4.) * ntval * static_cast<double>(nseed);  // Roughly estimated file size in bytes (octets).
     std::cout << TAG_INFO << "Save samples to file '" << filename << "', size ~" << (fsize/1e6) << " Mo...\n";
     
     std::ofstream ofs(filename);    // Open the output file.
@@ -414,19 +417,19 @@ void plotHistogram(const RealMatrix& tvalstore, const WaveSystem& sys, const dou
     for (const std::string& line : sys.summary()) {// Write the summary to the file header.
         ofs << "%% " << line << "\n";
     }
-    std::string info = "Transmission eigenvalues for Nprop=" + std::to_string(nprop) + ", Nseed=" + std::to_string(nseed) 
+    std::string info = "Transmission eigenvalues for Nprop=" + std::to_string(ntval) + ", Nseed=" + std::to_string(nseed) 
         + ", Tavg=" + std::to_string(tavg) + ", L/lscat_eff=" + std::to_string(dscat_eff) + ", Computation_time=" + std::to_string(ctime) + " s.";
     
     ofs << "%% Info: " << info << "\nT_0";
     
-    for (int ival = 1; ival < nprop; ival++) {// Loop over the input modes to finish the column names.
+    for (int ival = 1; ival < ntval; ival++) {// Loop over the input modes to finish the column names.
         ofs << sep << "T_" << ival;
     }
     ofs << "\n";
     
     for (int iseed = 0; iseed < nseed; iseed++) {// Loop over the rows of tvalstore.
         ofs << tvalstore(iseed, 0);
-        for (int ival = 1; ival < nprop; ival++) {// Loop over the samples.
+        for (int ival = 1; ival < ntval; ival++) {// Loop over the samples.
             ofs << sep << tvalstore(iseed, ival);
         }
         ofs << "\n";
@@ -449,9 +452,8 @@ void taskTransmissionSerial(WaveSystem& sys, RealMatrix& trange, const int nseed
     
     const int npoint = sys.getNPoint();
     const int nprofile = trange.getNrow();  // Get the desired number of profiles.
-    const int ntval = std::min(sys.getNInput(), sys.getNOutput());  // Get the total number of transmission eigenvalues (including zeros).
-    const int nprop = std::min(sys.getNInputProp(), sys.getNOutputProp());  // Get the number of propagationg modes (nonzero transmission eigenvalues).
-    RealMatrix tprofile(npoint, nprofile), nsample(nprofile, 1), tval(ntval, 1), tvalstore(nseed, nprop);
+    const int ntval = std::min(sys.getNInputProp(), sys.getNOutputProp());  // Get the number of nonzero transmission eigenvalues (propagating modes).
+    RealMatrix tprofile(npoint, nprofile), nsample(nprofile, 1), tval(ntval, 1), tvalstore(nseed, ntval);
     
     const std::string msg = "Tprofile, serial";
     
@@ -462,7 +464,7 @@ void taskTransmissionSerial(WaveSystem& sys, RealMatrix& trange, const int nseed
         sys.setDisorder(iseed+1); // Avoid seed zero for safety.
         sys.transmissionProfiles(trange, tprofile, nsample, tval);
         
-        for (int ival = 0; ival < nprop; ival++) {// Save the nonzero transmission eigenvalues in the matrix tvalstore.
+        for (int ival = 0; ival < ntval; ival++) {// Save the nonzero transmission eigenvalues in the matrix tvalstore.
             tvalstore(iseed, ival) = tval(ival, 0); // Copy the transmission eigenvalues.
         }
         
@@ -500,8 +502,8 @@ int main(int argc, char** argv) {
     
     // Checking operations:
     //ctx.sys.setDisorder(1);
-    ctx.sys.checkResidual();
-    ctx.sys.checkUnitarity(false);
+    //ctx.sys.checkResidual();
+    //ctx.sys.checkUnitarity(true);
     //ctx.sys.infoHamiltonian();
     //ctx.sys.plotMesh();
     //ctx.sys.plotInputState();
@@ -510,9 +512,9 @@ int main(int argc, char** argv) {
     //ctx.sys.plotGreenFunction();
     //ctx.sys.plotTransmissionStates();
     
-    //const int nseed = 1; // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
+    const int nseed = 1; // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
     
-    //taskTransmissionSerial(ctx.sys, ctx.trange, nseed);
+    taskTransmissionSerial(ctx.sys, ctx.trange, nseed);
     //taskTransmissionOMP(ctx.sys, ctx.trange, nseed);
     
     return 0;

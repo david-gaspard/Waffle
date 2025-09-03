@@ -23,21 +23,23 @@
 WaveSystem::WaveSystem(const std::string& sysname, const SquareMesh& mesh, const double kh, const double holscat, const double holabso) : 
         sysname(sysname),  // Use initializer list to allocate matrix sizes.
         mesh(mesh),
+        kh(checkWavenumber(kh)),
+        holscat(checkScattering(holscat)),
+        holabso(checkAbsorption(holabso)),
         npoint(mesh.getNPoint()),
         ninput(mesh.getNBoundary(BND_INPUT)),
         noutput(mesh.getNBoundary(BND_OUTPUT)),
+        ninputprop(computeNInputProp()),
+        noutputprop(computeNOutputProp()),
         computed(false),
         hamiltonian(npoint, npoint),
-        inputState(npoint, ninput),
-        outputState(npoint, noutput),
-        inputKlh(ninput, 1),
-        outputKlh(noutput, 1),
-        green(npoint, ninput)
+        inputState(npoint, ninputprop),
+        outputState(npoint, noutputprop),
+        inputKlh(ninputprop, 1),
+        outputKlh(noutputprop, 1),
+        green(npoint, ninputprop)
     {
     //std::cout << TAG_INFO << "Creating WaveSystem...\n";
-    setWavenumber(kh);
-    setScattering(holscat);
-    setAbsorption(holabso);
     computeHamiltonian();
     computeIOStates();
 }
@@ -47,40 +49,78 @@ WaveSystem::WaveSystem(const std::string& sysname, const SquareMesh& mesh, const
  ***********************************************************/
 
 /**
- * Assigns the value of the wavenumber, and check for possible invalid arguments.
+ * Check the validity of the given wavenumber, k*h, and returns it.
  */
-void WaveSystem::setWavenumber(const double kh) {
+double WaveSystem::checkWavenumber(const double kh) const {
     if (kh < 0.) {
         throw std::invalid_argument("In setWavenumber(): Wavenumber cannot be negative.");
     }
     else if (kh > 2.) {
         throw std::invalid_argument("In setWavenumber(): Wavenumber cannot exceed Nyquist-Shannon bound (kh<2).");
     }
-    this->kh = kh;
-    // WARNING: Calling this method should change the Hamiltonian...
+    return kh;
 }
 
 /**
  * Assigns the scattering strength, h/lscat.
  */
-void WaveSystem::setScattering(const double holscat) {
+double WaveSystem::checkScattering(const double holscat) const {
     if (holscat < 0.) {
         throw std::invalid_argument("In setScattering(): Scattering strength cannot be negative.");
     }
     else if (kh < holscat) {
         std::cout << TAG_WARN << "Scattering strength is large (k*lscat=" << kh/holscat << " <1). Localization may occur.\n";
     }
-    this->holscat = holscat;
-    // WARNING: Calling this method should change the Hamiltonian...
+    return holscat;
 }
 
 /**
  * Assigns the absorption strength, h/labso.
  */
-void WaveSystem::setAbsorption(const double holabso) {
-    this->holabso = holabso;
-    // WARNING: Calling this method should change the Hamiltonian...
+double WaveSystem::checkAbsorption(const double holabso) const {
+    return holabso;
 }
+
+
+/**************************
+ * OLD SETTERS (TO BE REMOVED)
+ *************************/
+
+///**
+// * Assigns the value of the wavenumber, and check for possible invalid arguments.
+// */
+//void WaveSystem::setWavenumber(const double kh) {
+//    if (kh < 0.) {
+//        throw std::invalid_argument("In setWavenumber(): Wavenumber cannot be negative.");
+//    }
+//    else if (kh > 2.) {
+//        throw std::invalid_argument("In setWavenumber(): Wavenumber cannot exceed Nyquist-Shannon bound (kh<2).");
+//    }
+//    this->kh = kh;
+//    // WARNING: Calling this method should change the Hamiltonian...
+//}
+//
+///**
+// * Assigns the scattering strength, h/lscat.
+// */
+//void WaveSystem::setScattering(const double holscat) {
+//    if (holscat < 0.) {
+//        throw std::invalid_argument("In setScattering(): Scattering strength cannot be negative.");
+//    }
+//    else if (kh < holscat) {
+//        std::cout << TAG_WARN << "Scattering strength is large (k*lscat=" << kh/holscat << " <1). Localization may occur.\n";
+//    }
+//    this->holscat = holscat;
+//    // WARNING: Calling this method should change the Hamiltonian...
+//}
+//
+///**
+// * Assigns the absorption strength, h/labso.
+// */
+//void WaveSystem::setAbsorption(const double holabso) {
+//    this->holabso = holabso;
+//    // WARNING: Calling this method should change the Hamiltonian...
+//}
 
 /***********************************************************
  * PUBLIC GETTERS
@@ -222,7 +262,7 @@ void WaveSystem::plotInputState() const {
     
     const std::string filename = uniqueFile("input_state", ".ppm");
     
-    const double fsize = 3*static_cast<double>(npoint)*ninput; // Estimated file size in bytes (octets).
+    const double fsize = 3*static_cast<double>(npoint)*ninputprop; // Estimated file size in bytes (octets).
     std::cout << TAG_INFO << "Plot input state to file '" << filename << "', size " << (fsize/1e6) << " Mo...\n";
     
     inputState.saveImage(filename);
@@ -235,7 +275,7 @@ void WaveSystem::plotOutputState() const {
     
     const std::string filename = uniqueFile("output_state", ".ppm");
     
-    const double fsize = 3*static_cast<double>(npoint)*noutput; // Estimated file size in bytes (octets).
+    const double fsize = 3*static_cast<double>(npoint)*noutputprop; // Estimated file size in bytes (octets).
     std::cout << TAG_INFO << "Plot output state to file '" << filename << "', size " << (fsize/1e6) << " Mo...\n";
     
     outputState.saveImage(filename);
@@ -320,9 +360,9 @@ void WaveSystem::plotGreenFunction() {
     computeGreenFunction();  // Ensure that the Green function has already been computed.
     
     // Compute the square modulus of the Green function:
-    RealMatrix intensity(npoint, ninput);
+    RealMatrix intensity(npoint, ninputprop);
     dcomplex psi;
-    for (int imode = 0; imode < ninput; imode++) {// Loop over the modes.
+    for (int imode = 0; imode < ninputprop; imode++) {// Loop over the modes.
         for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points.
             psi = green(ipoint, imode);
             intensity(ipoint, imode) = psi.real()*psi.real() + psi.imag()*psi.imag();
@@ -339,7 +379,7 @@ void WaveSystem::plotGreenFunction() {
 void WaveSystem::plotTransmissionStates() {
     
     // 1. First compute the transmission eigenstates.
-    const int nstate = std::min(noutput, ninput);
+    const int nstate = std::min(noutputprop, ninputprop);
     ComplexMatrix tstate(npoint, nstate);
     RealMatrix tval(nstate, 1);
     transmissionStates(tstate, tval);
@@ -374,7 +414,7 @@ void WaveSystem::computeHamiltonian() {
     const auto start_build = std::chrono::steady_clock::now(); // Gets the current time.
     
     MeshPoint p;
-    dcomplex kh2 = dcomplex(kh*kh, MEPS);
+    const dcomplex kh2 = dcomplex(kh*kh, MEPS);
     
     // 1. Preallocate the sparse Hamiltonian with an accurate estimate of the number of nonzero elements:
     //const int nnzub = ... // TODO: Find a tight upper bound on "nnz" and check the speedup......
@@ -461,6 +501,66 @@ void WaveSystem::setDisorder(const uint64_t seed) {
 }
 
 /**
+ * Computes and return the number of input propagating modes.
+ */
+int WaveSystem::computeNInputProp() const {
+    
+    int np, ninputprop = 0; // Initialize the number of input propagating modes (it will be incremented).
+    
+    for (const Opening& op : mesh.getOpening()) {// Loop over the openings.
+        
+        if (op.bndtype == BND_INPUT) {// If the opening is an input, then construct the modes.
+            
+            np = op.index.size();  // Number of point in the current input.
+            
+            /**
+             * 
+             * kh2 + d2ev > 0
+             * 
+             * d2ev = -4.*sin((i+1)*PI/(2*(n+1)))^2
+             * 
+             * kh2 - 4*sin((i+1)*PI/(2*(n+1)))^2 > 0, i=[0, n-1]
+             * 
+             * (2*(n+1)/PI) * asin(sqrt(kh2/4)) > ninputprop
+             * 
+             * ninputprop = std::floor( (2.*(np + 1)/PI) * std::asin(kh/2.) );
+             * 
+             */
+            
+            ninputprop += std::floor( (2.*(np + 1)/PI) * std::asin(kh/2.) );
+        }
+    }
+    
+    if (ninputprop == 0) {// Check for possible errors.
+        throw std::invalid_argument("In computeNInputProp(): The number of input progpating modes is zero. Please increase the number of points in the opening.");
+    }
+    
+    return ninputprop;
+}
+
+/**
+ * Computes and return the number of input propagating modes.
+ */
+int WaveSystem::computeNOutputProp() const {
+    
+    int np, noutputprop = 0; // Initialize the number of input propagating modes (it will be incremented).
+    
+    for (const Opening& op : mesh.getOpening()) {// Loop over the openings.
+        
+        if (op.bndtype == BND_OUTPUT) {// If the opening is an input, then construct the modes.
+            np = op.index.size();  // Number of point in the current input.
+            noutputprop += std::floor( (2.*(np + 1)/PI) * std::asin(kh/2.) );
+        }
+    }
+    
+    if (noutputprop == 0) {// Check for possible errors.
+        throw std::invalid_argument("In computeNInputProp(): The number of input progpating modes is zero. Please increase the number of points in the opening.");
+    }
+    
+    return noutputprop;
+}
+
+/**
  * Compute the input and output matrices containing the input and output modes.
  */
 void WaveSystem::computeIOStates() {
@@ -468,19 +568,16 @@ void WaveSystem::computeIOStates() {
     const auto start_build = std::chrono::steady_clock::now(); // Gets the current time.
     
     // Construct the input/output modes :
-    dcomplex kh2 = dcomplex(kh*kh, MEPS);
+    const dcomplex kh2 = dcomplex(kh*kh, MEPS);
     dcomplex klh;
     double d2ev;
     int np;          // Number of points in the current opening.
     int jinput = 0;  // Current number of input modes.
     int joutput = 0; // Current number of output modes.
-    
     dosinput = 0.;   // Initialize the density of states in the input lead(s).
     dosoutput = 0.;  // Initialize the density of states in the output lead(s).
-    ninputprop = 0;  // Initialize the number of propagating input modes.
-    noutputprop = 0; // Initialize the number of propagating output modes.
     
-    for (const Opening& op : mesh.getOpening()) {
+    for (const Opening& op : mesh.getOpening()) {// Loop over the openings.
         
         if (op.bndtype == BND_INPUT) {// If the opening is an input, then construct the modes.
             
@@ -488,18 +585,19 @@ void WaveSystem::computeIOStates() {
             ComplexMatrix u = modalMatrix(np);   // Construct the matrix of modes (each mode is normalized to 1).
             
             for (int j = 0; j < np; j++) {// Loop over the modes of U (columns of U).
-                for (int i = 0; i < np; i++) {// Loop over the points in the opening (rows of U).
-                    inputState(op.index.at(i), jinput) = u(i, j);
-                }
-                // Compute the effective wavenumbers in the input lead:
+                
+                // Compute the effective longitudinal wavenumber in the input lead:
                 d2ev = laplacianEigenvalue(j, np);  // Get the j^th Laplacian eigenvalue for an operator of size "np".
                 klh = std::sqrt( (kh2 + d2ev) * ( 1. - (kh2 + d2ev)/4. ) );  // Compute the effective longitudinal wavenumber.
-                if (std::abs(klh.real()) > std::abs(klh.imag())) {// If the current mode is propagating.
+                
+                if (std::abs(klh.real()) > std::abs(klh.imag())) {// If the mode is propagating.
+                    for (int i = 0; i < np; i++) {// Loop over the points in the opening (rows of U).
+                        inputState(op.index.at(i), jinput) = u(i, j);
+                    }
+                    inputKlh(jinput, 0) = klh;
                     dosinput += 1./klh.real();  // Increments the DOS in the input lead(s).
-                    ninputprop++;  // Increments the number of propagating input modes.
+                    jinput++;
                 }
-                inputKlh(jinput, 0) = klh;
-                jinput++;
             }
         }
         else if (op.bndtype == BND_OUTPUT) {// If the opening is an output, then construct the modes.
@@ -508,18 +606,19 @@ void WaveSystem::computeIOStates() {
             ComplexMatrix u = modalMatrix(np);   // Construct the matrix of modes (each mode is normalized to 1).
             
             for (int j = 0; j < np; j++) {// Loop over the modes of U (columns of U).
-                for (int i = 0; i < np; i++) {// Loop over the points in the opening (rows of U).
-                    outputState(op.index.at(i), joutput) = u(i, j);
-                }
-                // Compute the effective wavenumbers in the output lead:
+                
+                // Compute the effective longitudinal wavenumber in the output lead:
                 d2ev = laplacianEigenvalue(j, np);  // Get the j^th Laplacian eigenvalue for an operator of size "np".
                 klh = std::sqrt( (kh2 + d2ev) * ( 1. - (kh2 + d2ev)/4. ) );
+                
                 if (std::abs(klh.real()) > std::abs(klh.imag())) {// If the current mode is propagating.
+                    for (int i = 0; i < np; i++) {// Loop over the points in the opening (rows of U).
+                        outputState(op.index.at(i), joutput) = u(i, j);
+                    }
+                    outputKlh(joutput, 0) = klh;
                     dosoutput += 1./klh.real();  // Increments the DOS in the output lead(s).
-                    noutputprop++;  // Increments the number of propagating output modes.
+                    joutput++;
                 }
-                outputKlh(joutput, 0) = klh;
-                joutput++;
             }
         }
     }
@@ -529,12 +628,14 @@ void WaveSystem::computeIOStates() {
     outputState.finalize();
     
     // Normalize the density of states:
-    dosinput  /= 2*PI*ninput;
+    dosinput  /= 2*PI*ninput; // WARN: Should not this be ninputprop ????
     dosoutput /= 2*PI*noutput;
     
     // Compute the exact free density of states on a square lattice:
-    const double khm4 = 4. - kh*kh;
-    dosfree = (2./(PI*PI*khm4)) * ellipticK( kh*kh*(kh*kh - 8.)/(khm4*khm4) );
+    //const double khm4 = 4. - kh*kh;
+    //dosfree = (2./(PI*PI*khm4)) * ellipticK( kh*kh*(kh*kh - 8.)/(khm4*khm4) );
+    const double mkh = 1. - kh*kh/4.;
+    dosfree = ellipticK(1. - 1./(mkh*mkh))/(2.*PI*PI*mkh);
     
     // Measure the build time for information:
     double ctime_build = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_build).count();
@@ -559,10 +660,10 @@ void WaveSystem::computeGreenFunction() {
  */
 void WaveSystem::transmissionMatrix(ComplexMatrix& tmat) {
     
-    if (tmat.getNrow() != noutput || tmat.getNcol() != ninput) {// First check for possible errors.
+    if (tmat.getNrow() != noutputprop || tmat.getNcol() != ninputprop) {// First check for possible errors.
         std::string msg = "In transmissionMatrix(): Invalid transmission matrix size, received (" 
                         + std::to_string(tmat.getNrow()) + ", " + std::to_string(tmat.getNcol()) + "), expected (" 
-                        + std::to_string(noutput) + ", " + std::to_string(ninput) + ").";
+                        + std::to_string(noutputprop) + ", " + std::to_string(ninputprop) + ").";
         throw std::invalid_argument(msg);
     }
     
@@ -570,8 +671,8 @@ void WaveSystem::transmissionMatrix(ComplexMatrix& tmat) {
     tmat = outputState.conj() * green;  // Project the Green function over the output states.
     
     // Apply the Fisher & Lee relation :
-    for (int i = 0; i < noutput; i++) {// Loop over the output channels (rows).
-        for (int j = 0; j < ninput; j++) {// Loop over the input channels (columns).
+    for (int i = 0; i < noutputprop; i++) {// Loop over the output channels (rows).
+        for (int j = 0; j < ninputprop; j++) {// Loop over the input channels (columns).
             tmat(i, j) = 2. * I * std::sqrt(inputKlh(j, 0).real() * outputKlh(i, 0).real()) * tmat(i, j);
             // Note that the real parts strip the evanescent modes.
         }
@@ -584,10 +685,10 @@ void WaveSystem::transmissionMatrix(ComplexMatrix& tmat) {
  */
 void WaveSystem::reflectionMatrix(ComplexMatrix& rmat) {
     
-    if (rmat.getNrow() != ninput || rmat.getNcol() != ninput) {// First check for possible errors.
+    if (rmat.getNrow() != ninputprop || rmat.getNcol() != ninputprop) {// First check for possible errors.
         std::string msg = "In reflectionMatrix(): Invalid reflection matrix size, received (" 
                         + std::to_string(rmat.getNrow()) + ", " + std::to_string(rmat.getNcol()) + "), expected (" 
-                        + std::to_string(ninput) + ", " + std::to_string(ninput) + ").";
+                        + std::to_string(ninputprop) + ", " + std::to_string(ninputprop) + ").";
         throw std::invalid_argument(msg);
     }
     
@@ -595,8 +696,8 @@ void WaveSystem::reflectionMatrix(ComplexMatrix& rmat) {
     rmat = inputState.conj() * green;  // Project the Green function over the input states.
     
     // Apply the Fisher & Lee relation :
-    for (int i = 0; i < ninput; i++) {// Loop over the input channels (rows).
-        for (int j = 0; j < ninput; j++) {// Loop over the input channels (columns).
+    for (int i = 0; i < ninputprop; i++) {// Loop over the input channels (rows).
+        for (int j = 0; j < ninputprop; j++) {// Loop over the input channels (columns).
             rmat(i, j) = 2. * I * std::sqrt(inputKlh(j, 0).real() * inputKlh(i, 0).real()) * rmat(i, j);
             // Note that the real parts strip the evanescent modes.
         }
@@ -618,7 +719,7 @@ void WaveSystem::checkResidual() {
     dcomplex elem, elem_expc;
     
     for (int i = 0; i < npoint; i++) {// Loop over the mesh points.
-        for (int j = 0; j < ninput; j++) {// Loop over the input modes.
+        for (int j = 0; j < ninputprop; j++) {// Loop over the input modes.
             elem = inputState_product(i, j);
             elem_expc = inputState.get(i, j);
             res = std::abs(elem - elem_expc);
@@ -629,7 +730,7 @@ void WaveSystem::checkResidual() {
             }
         }
     }
-    std::cout << TAG_INFO << "Total residual = " << res_total << ".\n";
+    std::cout << TAG_INFO << "Average residual = " << (res_total/npoint)/ninputprop << " (total=" << res_total << ").\n";
 }
 
 /**
@@ -639,17 +740,17 @@ void WaveSystem::checkResidual() {
  * If "showtval" is "true", then compute the transmission eigenvalues and print them to standard output.
  */
 void WaveSystem::checkUnitarity(const bool showtval) {
-    ComplexMatrix tmat(noutput, ninput), rmat(ninput, ninput), unitarity(ninput, ninput);
+    ComplexMatrix tmat(noutputprop, ninputprop), rmat(ninputprop, ninputprop), unitarity(ninputprop, ninputprop);
     transmissionMatrix(tmat);
     reflectionMatrix(rmat);
     
-    unitarity = tmat.conj() * tmat + rmat.conj() * rmat - identityMatrix(ninput);  // The unitarity matrix should ideally be zero on output.
+    unitarity = tmat.conj() * tmat + rmat.conj() * rmat - identityMatrix(ninputprop);  // The unitarity matrix should ideally be zero on output.
     
     std::cout << TAG_INFO << "Unitarity: t^H * t + r^H * r - 1 = " << unitarity.norm() << "\n";
     
     if (showtval) {// Compute and print the transmission eigenvalues.
-        const int ntval = std::min(noutput, ninput);  // Number of transmission eigenvalues.
-        ComplexMatrix u(noutput, noutput), vh(ninput, ninput);
+        const int ntval = std::min(noutputprop, ninputprop);  // Number of transmission eigenvalues.
+        ComplexMatrix u(noutputprop, noutputprop), vh(ninputprop, ninputprop);
         RealMatrix tval(ntval, 1);
         svd(tmat, tval, u, vh);  // Compute the singular value decomposition (SVD).
         for (int i = 0; i < ntval; i++) tval(i, 0) = tval(i, 0)*tval(i, 0);  // COnvert singular values of "t" to transmission eigenvalues.
@@ -662,13 +763,13 @@ void WaveSystem::checkUnitarity(const bool showtval) {
  * 
  * Arguments:
  * 
- * tstate  = On output, selected transmission eigenstates. Size: (npoint, min(ninput, noutput)).
- * tval    = On output, list of transmission eigenvalues. Size: (min(ninput, noutput), 1).
+ * tstate  = On output, selected transmission eigenstates. Size: (npoint, min(ninputprop, noutputprop)).
+ * tval    = On output, list of transmission eigenvalues. Size: (min(ninputprop, noutputprop), 1).
  */
 void WaveSystem::transmissionStates(ComplexMatrix& tstate, RealMatrix& tval) {
     
     // 1. First check for possible errors:
-    const int ntval = std::min(ninput, noutput);
+    const int ntval = std::min(ninputprop, noutputprop);
     if (tstate.getNrow() != npoint || tstate.getNcol() != ntval) {
         std::string msg = "In transmissionStates(): Invalid size of 'tstate'. Received ("
                         + std::to_string(tstate.getNrow()) + ", " + std::to_string(tstate.getNcol()) + "), expected ("
@@ -683,11 +784,11 @@ void WaveSystem::transmissionStates(ComplexMatrix& tstate, RealMatrix& tval) {
     }
     
     // 2. Solve the wave equation and compute the transmission matrix:
-    ComplexMatrix tmat(noutput, ninput);
+    ComplexMatrix tmat(noutputprop, ninputprop);
     transmissionMatrix(tmat);  // We only need the transmission matrix, not the reflection matrix.
     
     // 3. Perform the SVD of the transmission matrix:
-    ComplexMatrix u(noutput, noutput), vh(ninput, ninput);
+    ComplexMatrix u(noutputprop, noutputprop), vh(ninputprop, ninputprop);
     svd(tmat, tval, u, vh);  // t = U S V^H  -->  t^H t = V S^2 V^H
     
     for (int i = 0; i < ntval; i++) {// Loop on the singular values.
@@ -703,8 +804,8 @@ void WaveSystem::transmissionStates(ComplexMatrix& tstate, RealMatrix& tval) {
     computeGreenFunction();  // Ensure the Green function has been computed already (this line does nothing if it is so).
     
     // Normalize the input state to get approximately unit incident intensity:
-    for (int jmode = 0; jmode < ninput; jmode++) {// Loop over the input waveguide modes.
-        for (int istate = 0; istate < ninput; istate++) {// Loop over the input transmission eigenstates.
+    for (int jmode = 0; jmode < ninputprop; jmode++) {// Loop over the input waveguide modes.
+        for (int istate = 0; istate < ninputprop; istate++) {// Loop over the input transmission eigenstates.
             vh(istate, jmode) *= std::conj(I*std::sqrt(2.*ninputprop/(PI*dosinput))*std::sqrt(inputKlh(jmode, 0).real()));
             // Each column of "V" (row of V^H) is the transmission eigenstate (in modal representation).
             // Note that the real part, Re(inputKlh), strips the evanescent modes.
@@ -727,13 +828,13 @@ void WaveSystem::transmissionStates(ComplexMatrix& tstate, RealMatrix& tval) {
  *            This method adds the profiles directly to "tprofile", so this matrix must be initialized to zero.
  * nsample  = On output, number of found transmission eigenstates in the prescribed intervals. Size: (nprofile, 1).
  *            This method increments the number of found transmission eigenstates, so "nsample" must be initialized to zero.
- * tval     = On output, list of all transmission eigenvalues (ignoring considerations on eigenstates). Size: (min(ninput, noutput), 1).
+ * tval     = On output, list of all transmission eigenvalues (ignoring considerations on eigenstates). Size: (min(ninputprop, noutputprop), 1).
  */
 void WaveSystem::transmissionProfiles(const RealMatrix& trange, RealMatrix& tprofile, RealMatrix& nsample, RealMatrix& tval) {
     
     // 1. First check for possible errors:
     const int nprofile = trange.getNrow();
-    const int ntval = std::min(ninput, noutput);
+    const int ntval = std::min(ninputprop, noutputprop);
     if (trange.getNcol() != 2) {
         throw std::invalid_argument("In transmissionProfiles(): Invalid size of 'trange', expected 2 columns for Tmin and Tmax.");
     }
@@ -757,7 +858,7 @@ void WaveSystem::transmissionProfiles(const RealMatrix& trange, RealMatrix& tpro
     }
     
     // 2. Compute the singular value decomposition of the transmission matrix:
-    ComplexMatrix tmat(noutput, ninput), u(noutput, noutput), vh(ninput, ninput);
+    ComplexMatrix tmat(noutputprop, ninputprop), u(noutputprop, noutputprop), vh(ninputprop, ninputprop);
     transmissionMatrix(tmat);  // We only need the transmission matrix, not the reflection matrix.
     
     svd(tmat, tval, u, vh);  // Perform the SVD. t = U S V^H  -->  t^H t = V S^2 V^H. 
@@ -787,7 +888,7 @@ void WaveSystem::transmissionProfiles(const RealMatrix& trange, RealMatrix& tpro
                     
                     // Compute the transmission eigenstate associated to "t":
                     psi = 0.;
-                    for (int imode = 0; imode < ninput; imode++) {// Loop over the input modes to construct the transmission eigenstate at "ipoint".
+                    for (int imode = 0; imode < ninputprop; imode++) {// Loop over the input modes to construct the transmission eigenstate at "ipoint".
                         psi += green(ipoint, imode) * I*std::sqrt(2.*ninputprop/(PI*dosinput)) 
                              * std::sqrt(inputKlh(imode, 0).real()) * std::conj(vh(ival, imode));
                     }

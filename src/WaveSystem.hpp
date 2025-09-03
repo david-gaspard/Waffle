@@ -20,6 +20,13 @@ class WaveSystem {
     std::string sysname;  // String containing the name of the system (typically describing the system geometry) which is used to generate file output.
     
     SquareMesh mesh;   // Square mesh object.
+    
+    double kh;         // Wavenumber times the lattice step, 2*pi*h/lambda. Also the phase accumulated across a lattice step (in radian).
+    double holscat;    // Lattice step divided by the scattering mean free path, h/lscat. Total length is not a well defined unit.
+    double holabso;    // Lattice step divided by the absorption length, h/labso. Total length is not a well defined unit.
+    
+    // TODO: Maybe store the complex wavenumber "khc" defined by kh + I*(h/labso)/2 ??
+    
     int npoint;        // Total number of points in the "mesh".
     int ninput;        // Number of points in the input, also equal to the number of input modes.
     int noutput;       // Number of points in the output, also equal to the number of output modes.
@@ -28,12 +35,6 @@ class WaveSystem {
     double dosinput;   // Density of states in the input lead(s).
     double dosoutput;  // Density of states in the input lead(s).
     double dosfree;    // Free density of states on a square lattice. Exact value based on the elliptic integral K(k).
-    
-    double kh;         // Wavenumber times the lattice step, 2*pi*h/lambda. Also the phase accumulated across a lattice step (in radian).
-    double holscat;    // Lattice step divided by the scattering mean free path, h/lscat. Total length is not a well defined unit.
-    double holabso;    // Lattice step divided by the absorption length, h/labso. Total length is not a well defined unit.
-    
-    // TODO: Maybe store the complex wavenumber "khc" defined by kh + I*(h/labso)/2 ??
     
     bool computed;     // Flag indicating if the Green function have been computed. "true" if "green" has been computed, "false" otherwise.
                        // This flag is set to "false" each time the Hamiltonian is modified by setDisorder(), and set to "true" by computeGreenFunction().
@@ -90,13 +91,19 @@ class WaveSystem {
     
     private:
     
+    //void setWavenumber(const double kh);
+    //void setScattering(const double holscat);
+    //void setAbsorption(const double holabso);
+    
     // Private setters (because the Hamiltonian should be recomputed):
-    void setWavenumber(const double kh);
-    void setScattering(const double holscat);
-    void setAbsorption(const double holabso);
+    double checkWavenumber(const double kh) const;
+    double checkScattering(const double holscat) const;
+    double checkAbsorption(const double holabso) const;
     
     // Private computational methods:
     void computeHamiltonian();
+    int computeNInputProp() const;
+    int computeNOutputProp() const;
     void computeIOStates();
     void computeGreenFunction();
     
