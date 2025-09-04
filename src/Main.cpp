@@ -12,31 +12,39 @@
  * @todo TODO LIST:
  * DONE: (1)  In WaveSystem: If possible, compute the exact expression of the free DOS on a square lattice. It is used in setDisorder()...
  * DONE: (2)  In Waffle/Usador: Make the figures for Arthur (see below)...
- * DONE: (3)  In WaveSystem: Check in doing math that the normalization of transmission eigenstates is correct.
- * DONE: (4)  Calculate the condition number of the "hamiltonian" for a waveguide by estimating the lowest eigenstate. 
+ * DONE: (3)  In plot_map.py: Fix the partial read bug with the CSV reader which occurs when it is called by the C++ program...
+ * DONE: (4)  In WaveSystem: Check in doing math that the normalization of transmission eigenstates is correct.
+ * DONE: (5)  Calculate the condition number of the "hamiltonian" for a waveguide by estimating the lowest eigenstate. 
  *            This would indicate whether using iterative methods (instead of direct solvers) is relevant or not...
- * DONE: (5)  In SparseComplexMatrix: Try to optimize the construction of the Hamiltonian.
+ * DONE: (6)  In SparseComplexMatrix: Try to optimize the construction of the Hamiltonian.
  *            Check if there is a faster object than "vector" for insertion:
  *            - See "map" (binary tree): faster for insertion than "vector" (no realloc), faster for accessing by key, slower for traversal (no direct linkage).
  *              Probably most appropriate choice if and only if traversal is not too slow compared to "vector".
  *            - See "forward_list" (linked list): faster for insertion than vector (no realloc), faster for traversal, slower for accessing by key 
  *              (no binary search). Both objects should be tested for speed in construction and in conversion for UMFPack.
- * DONE: (6)  Note that if binary trees are indeed faster for sorted insertion/deletion, then "set" would be more appropriate for the points in SquareMesh...
- * DONE: (7)  In Main: Add histogram of transmission eigenvalues. Simply save all raw eigenvalues in a CSV file (each row per disorder realization)...
- * DONE: (8)  Write "plot_histo.py" to plot the histogram of a list of values in given interval [Tmin, Tmax] using Nbins.
- * DONE: (9)  In WaveSystem: Add checkResidual() to verify that the linear system is correctly solved...
- * DONE: (10) In WaveSystem: Maybe remove the evanescent modes from "inputState" and "outputState" because they always give zero transmission eigenvalues...
- * DONE: (11) In SparseComplexMatrix: Implement solveMumps() (no iterative refinement) and compare performance with solveUmfpack()...
+ * DONE: (7)  Note that if binary trees are indeed faster for sorted insertion/deletion, then "set" would be more appropriate for the points in SquareMesh...
+ * DONE: (8)  In Main: Add histogram of transmission eigenvalues. Simply save all raw eigenvalues in a CSV file (each row per disorder realization)...
+ * DONE: (9)  Write "plot_histo.py" to plot the histogram of a list of values in given interval [Tmin, Tmax] using Nbins.
+ * DONE: (10) In all plot scripts: Extract the header of the CSV file and copy it into the "title" of pgfplots' "axis" environment.
+ * DONE: (11) In WaveSystem: Add checkResidual() to verify that the linear system is correctly solved...
+ * DONE: (12) In WaveSystem: Maybe remove the evanescent modes from "inputState" and "outputState" because they always give zero transmission eigenvalues...
+ * DONE: (13) In SparseComplexMatrix: Implement solveMumps() (no iterative refinement) and compare performance with solveUmfpack()...
+ * DONE: (14) Arthur 2025-09-04: Implement the average intensity Ibar(r) without wavefront shaping...
  * 
- * (12) In Main: Add parallelized taskTransmissionOMP()...
+ * (15) Create script "plot_cut.py" to plot the intensity profile along a cut. A straight line should do the job...
  * 
- * DONE: (13) In plot_map.py: Fix the partial read bug with the CSV reader which occurs when it is called by the C++ program...
- * (14) Create script "plot_cut.py" to plot the intensity profile along a cut. A straight line should do the job...
- * (15) In SquareMesh: Create addImage(filename) to import PNG in order to facilitate the mesh creation...
- * (16) In SparseComplexMatrix: Improve plotImage() to export directly a PNG image instead of a heavy PPM file.
- * (17) Do no forget to implement the absorption (holabso != 0) using complex wavenumbers.
+ * (16) In SquareMesh: Create addImage(filename) to import PNG in order to facilitate the mesh creation...
+ * (17) In SparseComplexMatrix: Improve plotImage() to export directly a PNG image instead of a heavy PPM file.
+ * (18) Arthur 2025-09-04: For the paper, come back with the double waveguide case (with/without absorber), and compute the eigenstate profile
+ *      and the transmission eigenvalue distribution. Test changing the numerical aperture of each of the guides...
+ * (19) Arthur 2025-09-04: What happens if we add a non-scattering region in the center of the waveguide ?
+ *      We would have D(r) -> infty... What happens in the Usadel equation ?
+ *      It would be funny to find a system with transmission eigenstate "opposite" to the average intensity (without shaping). 
+ *      Such that maximum of the eigenstate corresponds to the minimum of the average intensity...
+ * (20) Do no forget to implement the absorption (holabso != 0) using complex wavenumbers.
  *      Check that the implementation is correct, maybe using the Green function, or the distribution rho(T) (which should match RecurGreen's results)...
- * DONE: (18) In all plot scripts: Extract the header of the CSV file and copy it into the "title" of pgfplots' "axis" environment.
+ * (21) In Main: Possibly add parallelized taskTransmissionOMP(). Maybe MPI is more relevant, given the memory size of reference 1 Mpx simulations...
+ * (22) Arthur 2025-09-04: For the paper, come back on the geometrical interpretation of the Q space and the (theta,eta) parametrization...
  */
 
 /**
@@ -335,7 +343,7 @@ Context createDoubleWaveguide2() {
 }
 
 /***************************************************************************************************
- * COMPUTATIONAL FUNCTIONS
+ * COMPUTATION OF TRANSMISSION EIGENSTATES
  ***************************************************************************************************/
 
 /**
@@ -452,13 +460,12 @@ void taskTransmissionSerial(WaveSystem& sys, RealMatrix& trange, const int nseed
     RealMatrix tprofile(npoint, nprofile), nsample(nprofile, 1), tval(ntval, 1), tvalstore(nseed, ntval);
     
     const std::string msg = "Tprofile, serial";
-    
     const auto start = std::chrono::steady_clock::now(); // Gets the current time.
     
     for (int iseed = 0; iseed < nseed; iseed++) {// Loop over realizations of the disorder.
         
-        sys.setDisorder(iseed+1); // Avoid seed zero for safety.
-        sys.transmissionProfiles(trange, tprofile, nsample, tval);
+        sys.setDisorder(iseed+1); // Avoid seed=0 for safety.
+        sys.addTransmissionProfiles(trange, tprofile, nsample, tval);
         
         for (int ival = 0; ival < ntval; ival++) {// Save the nonzero transmission eigenvalues in the matrix tvalstore.
             tvalstore(iseed, ival) = tval(ival, 0); // Copy the transmission eigenvalues.
@@ -470,7 +477,7 @@ void taskTransmissionSerial(WaveSystem& sys, RealMatrix& trange, const int nseed
     }
     
     // End progress bar and compute the total time (in seconds):
-    double ctime = endProgressBar(start);
+    const double ctime = endProgressBar(start);
     
     // Save data to files and plot:
     normalizeTProfile(tprofile, nsample);  // Normalize the averages of transmission eigenstate profiles.
@@ -478,9 +485,45 @@ void taskTransmissionSerial(WaveSystem& sys, RealMatrix& trange, const int nseed
     plotHistogram(tvalstore, sys, ctime);
 }
 
+/***************************************************************************************************
+ * COMPUTATION OF MODE-AVERAGED INTENSITY
+ ***************************************************************************************************/
+
 /**
- * Main function of the program.
+ * Compute the mode-average intensity averaged over "nseed" realizations of the disorder.
+ * Save the results to files with automated names, and call external plot scripts.
  */
+void taskAverageIntensitySerial(WaveSystem& sys, const int nseed) {
+    
+    const int npoint = sys.getNPoint();
+    RealMatrix ibar(npoint, 1);
+    
+    const std::string msg = "Ibar, serial";
+    const auto start = std::chrono::steady_clock::now(); // Gets the current time.
+    
+    for (int iseed = 0; iseed < nseed; iseed++) {// Loop over realizations of the disorder.
+        
+        sys.setDisorder(iseed+1); // Avoid seed=0 for safety.
+        sys.addAverageIntensity(ibar);
+        printProgressBar(iseed+1, nseed, msg, start);
+    }
+    
+    // Normalize the disorder average:
+    for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points.
+        ibar(ipoint, 0) /= nseed;
+    }
+    
+    // End progress bar and compute the total time (in seconds):
+    const double ctime = endProgressBar(start);
+    
+    // Save the data and plot:
+    const std::string info = "Mode-averaged intensity Ibar for Nseed=" + std::to_string(nseed) + ", Computation_time=" + std::to_string(ctime) + " s.";
+    sys.plotIntensity(ibar, info, "ibar");
+}
+
+/***************************************************************************************************
+ * MAIN FUNCTION OF THE PROGRAM
+ ***************************************************************************************************/
 int main(int argc, char** argv) {
     
     std::cout << "****** This is " << PROGRAM_COPYRIGHT << " ******\n";
@@ -495,9 +538,9 @@ int main(int argc, char** argv) {
     //Context ctx = createDoubleWaveguide2();
     
     ctx.sys.printSummary();
+    ctx.sys.infoHamiltonian();
     
     // Checking operations:
-    ctx.sys.infoHamiltonian();
     //ctx.sys.setDisorder(1);
     //ctx.sys.checkResidual();
     //ctx.sys.checkUnitarity(true);
@@ -508,10 +551,11 @@ int main(int argc, char** argv) {
     //ctx.sys.plotGreenFunction();
     //ctx.sys.plotTransmissionStates();
     
-    const int nseed = 1; // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
+    const int nseed = 100; // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
     
-    taskTransmissionSerial(ctx.sys, ctx.trange, nseed);
+    //taskTransmissionSerial(ctx.sys, ctx.trange, nseed);
     //taskTransmissionOMP(ctx.sys, ctx.trange, nseed);
+    taskAverageIntensitySerial(ctx.sys, nseed);
     
     return 0;
 }

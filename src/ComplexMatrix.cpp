@@ -141,6 +141,34 @@ ComplexMatrix ComplexMatrix::conj() const {
 }
 
 /**
+ * Returns the real part of the present matrix.
+ */
+RealMatrix ComplexMatrix::real() const {
+    
+    RealMatrix re(nrow, ncol);
+    
+    for (int l = 0; l < nrow*ncol; l++) {// Loop over the matrix elements.
+        re.data[l] = data[l].real();
+    }
+    
+    return re;
+}
+
+/**
+ * Returns the imaginary part of the present matrix.
+ */
+RealMatrix ComplexMatrix::imag() const {
+    
+    RealMatrix im(nrow, ncol);
+    
+    for (int l = 0; l < nrow*ncol; l++) {// Loop over the matrix elements.
+        im.data[l] = data[l].imag();
+    }
+    
+    return im;
+}
+
+/**
  * Defines the addition of two matrices of same dimensions.
  */
 ComplexMatrix operator+(const ComplexMatrix& a, const ComplexMatrix& b) {

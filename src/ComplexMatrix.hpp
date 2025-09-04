@@ -36,6 +36,8 @@ class ComplexMatrix {
     // Mathematical operations:
     double norm() const;
     ComplexMatrix conj() const;
+    RealMatrix real() const;
+    RealMatrix imag() const;
     friend ComplexMatrix operator+(const ComplexMatrix& a, const ComplexMatrix& b);
     friend ComplexMatrix operator-(const ComplexMatrix& a, const ComplexMatrix& b);
     friend ComplexMatrix operator*(const dcomplex scalar, const ComplexMatrix& a);

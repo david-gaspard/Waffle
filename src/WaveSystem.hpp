@@ -66,10 +66,10 @@ class WaveSystem {
     double getScattering() const;
     double getAbsorption() const;
     std::string getName() const;
-    
-    // Print methods:
     std::string uniqueFile(const std::string& dataname, const std::string& extension) const;
     std::vector<std::string> summary() const;
+    
+    // Print/save methods:
     void printSummary() const;
     void infoHamiltonian() const;
     void plotHamiltonian() const;
@@ -87,15 +87,12 @@ class WaveSystem {
     void checkUnitarity(const bool showtval);
     void checkResidual();
     void transmissionStates(ComplexMatrix& tstate, RealMatrix& tval);
-    void transmissionProfiles(const RealMatrix& trange, RealMatrix& tprofile, RealMatrix& nsample, RealMatrix& tval);
+    void addTransmissionProfiles(const RealMatrix& trange, RealMatrix& tprofile, RealMatrix& nsample, RealMatrix& tval);
+    void addAverageIntensity(RealMatrix& ibar);
     
     private:
     
-    //void setWavenumber(const double kh);
-    //void setScattering(const double holscat);
-    //void setAbsorption(const double holabso);
-    
-    // Private setters (because the Hamiltonian should be recomputed):
+    // Private setters (because the Hamiltonian should be recomputed afterwards):
     double checkWavenumber(const double kh) const;
     double checkScattering(const double holscat) const;
     double checkAbsorption(const double holabso) const;

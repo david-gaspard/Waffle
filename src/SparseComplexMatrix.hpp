@@ -62,7 +62,6 @@ class SparseComplexMatrix {
     // Mathematical operations:
     double norm() const;
     SparseComplexMatrix conj() const;
-    //bool isSymmetric(const double tol = 1e-12) const;
     friend SparseComplexMatrix operator*(const dcomplex scalar, const SparseComplexMatrix& a);
     friend SparseComplexMatrix operator*(const SparseComplexMatrix& a, const dcomplex scalar);
     friend ComplexMatrix operator*(const SparseComplexMatrix& a, const ComplexMatrix& b);

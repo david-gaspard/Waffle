@@ -255,7 +255,7 @@ int testSolveMumps2() {
     a(3, 2) = 3;  a(4, 2) = 2;  a(2, 3) = 3;  a(1, 4) = 10;  a(2, 4) =  2;  a(4, 4) = 1;
     a.finalize();
     
-    printInfoMatrix("A", a);
+    //printInfoMatrix("A", a);
     
     SparseComplexMatrix b(n, 1);
     b(0, 0) = 14;  b(1, 0) = 65;  b(2, 0) = 19;  b(3, 0) = 9;  b(4, 0) = 31;
@@ -333,9 +333,9 @@ int main(int argc, char** argv) {
     //testFilling1();
     //testFilling2();
     //testHybridProduct();
-    //testSolveUmfpack1();
-    //testSolveUmfpack2();
-    //testSolveUmfpack3();
+    testSolveUmfpack1();
+    testSolveUmfpack2();
+    testSolveUmfpack3();
     testSolveMumps1();
     testSolveMumps2();
     testSolveMumps3();

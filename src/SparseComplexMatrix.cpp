@@ -8,8 +8,7 @@
 #include "Color.hpp"
 #include "BaseTools.hpp"
 #include <suitesparse/umfpack.h>
-#include "zmumps_c.h"  // MUMPS header for double precision complex arithmetic.
-#include "mpi.h"  // MUMPS requires MPI even if it is used in sequential.
+#include <zmumps_c.h>  // MUMPS header for double precision complex arithmetic (code tested with MUMPS 5.8.0).
 #include <algorithm>
 #include <fstream>
 
@@ -517,23 +516,18 @@ void solveUmfpack(const SparseComplexMatrix& a, const SparseComplexMatrix& b, Co
  */
 void solveMumps(const SparseComplexMatrix& a, const SparseComplexMatrix& b, ComplexMatrix& x) {
     
-    // 1. First check for possible errors in the input:
-    checkSolverInput(a, b, x);
+    checkSolverInput(a, b, x);  // Check for possible invalid arguments.
     
-    //int myid, argc = 0;
-    //char** argv{};
-    //MPI_Init(&argc, &argv);
-    //MPI_Comm_rank(MPI_COMM_WORLD, &myid);
-    
+    //====== Initialize a MUMPS instance ======
     ZMUMPS_STRUC_C id;  // Declare a new MUMPS object.
-    id.comm_fortran = MPI_COMM_WORLD;
+    id.comm_fortran = -987654;  // Tell MUMPS to use the default MPI communicator for Fortran (see MUMPS manual).
     id.par = 1;  // Declares that the host is involved in the factorization and solve phases (id.par=1 for sequential solve).
     id.sym = a.symmetric ? 2 : 0;  // Declares the symmetry of the matrix.
     id.job = -1; // Declares that this call initializes an instance of the package.
     zmumps_c(&id);
     
     //====== Enter the sparse matrix A ======
-    #define ICNTL(I) icntl[(I)-1] // Macro such that indices match documentation.
+    #define ICNTL(I) icntl[(I)-1] // Macro such that indices match documentation (see MUMPS manual).
     id.ICNTL(5) = 0;  // Declare the use of assembled format (standard triplet format).
     const int a_nnz  = a.symmetric ? (a.triplet.size() + a.nrow)/2 : a.triplet.size();
     auto a_elem = new mumps_double_complex[a_nnz];
@@ -617,17 +611,15 @@ void solveMumps(const SparseComplexMatrix& a, const SparseComplexMatrix& b, Comp
     }
     
     //====== Termination instructions ======
-    delete[] id.rhs; // Ensure the memory allocated by the solution is free.
-    id.job = -2;  // Terminates an instance of the package.
-    zmumps_c(&id);
+    delete[] id.rhs; // First ensure the memory allocated by the solution is free.
+    id.job = -2; // Declares the termination of the MUMPS instance.
+    zmumps_c(&id); // Termination.
     
-    delete[] a_elem;
+    delete[] a_elem; // Finally, frees the memory.
     delete[] a_irow;
     delete[] a_jcol;
     delete[] b_elem;
     delete[] b_irow;
     delete[] b_pcol;
-    
-    //MPI_Finalize();
 }
 
