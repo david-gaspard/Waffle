@@ -213,6 +213,119 @@ int testSolveUmfpack3() {
 }
 
 /**
+ * Test the solution of a sparse linear system A.x = b using the MUMPS solver.
+ */
+int testSolveMumps1() {
+    std::cout << "====== TEST SOLVE MUMPS #1 - NONSYMMETRIC MATRIX ======" << std::endl;
+    
+    const int n = 5;
+    SparseComplexMatrix a(n, n);
+    a(0, 0) = 2;   a(1, 0) = 3;  a(0, 1) = 3;  a(2, 1) = -1;  a(4, 1) = 4;  a(1, 2) = 4;
+    a(2, 2) = -3;  a(3, 2) = 1;  a(4, 2) = 2;  a(2, 3) = 2;   a(1, 4) = 6;  a(4, 4) = 1;
+    a.finalize();
+    
+    //printInfoMatrix("A", a);
+    
+    SparseComplexMatrix b(n, 1);
+    b(0, 0) = 8;  b(1, 0) = 45;  b(2, 0) = -3;  b(3, 0) = 3;  b(4, 0) = 19; 
+    b.finalize();
+    
+    ComplexMatrix x(n, 1), x_expc(n, 1);
+    x_expc(0, 0) = 1;  x_expc(1, 0) = 2;  x_expc(2, 0) = 3;  x_expc(3, 0) = 4;  x_expc(4, 0) = 5;
+    
+    solveMumps(a, b, x);
+    
+    //x.print("Solution x");
+    
+    std::cout << TAG_INFO << "Error = " << (x - x_expc).norm() << "\n";
+    
+    return 0;
+}
+
+/**
+ * Test the solution of a sparse linear system A.x = b using the MUMPS solver.
+ * This tests the case of a symmetric matrix.
+ */
+int testSolveMumps2() {
+    std::cout << "====== TEST SOLVE MUMPS #2 - SYMMETRIC MATRIX ======" << std::endl;
+    
+    const int n = 5;
+    SparseComplexMatrix a(n, n);
+    a(0, 0) = 2;  a(1, 0) = 6;  a(0, 1) = 6;  a(2, 1) =  3;  a(4, 1) = 10;  a(1, 2) = 3;  a(2, 2) = -3;
+    a(3, 2) = 3;  a(4, 2) = 2;  a(2, 3) = 3;  a(1, 4) = 10;  a(2, 4) =  2;  a(4, 4) = 1;
+    a.finalize();
+    
+    printInfoMatrix("A", a);
+    
+    SparseComplexMatrix b(n, 1);
+    b(0, 0) = 14;  b(1, 0) = 65;  b(2, 0) = 19;  b(3, 0) = 9;  b(4, 0) = 31;
+    b.finalize();
+    
+    ComplexMatrix x(n, 1), x_expc(n, 1);
+    x_expc(0, 0) = 1;  x_expc(1, 0) = 2;  x_expc(2, 0) = 3;  x_expc(3, 0) = 4;  x_expc(4, 0) = 5;
+    
+    solveMumps(a, b, x);
+    
+    //x.print("Solution x");
+    
+    std::cout << TAG_INFO << "Error = " << (x - x_expc).norm() << "\n";
+    
+    return 0;
+}
+
+/**
+ * Test the solution of a sparse linear system A.xb = b using the MUMPS solver.
+ * Case fully complex with multiple right-hand sides.
+ */
+int testSolveMumps3() {
+    std::cout << "====== TEST SOLVE MUMPS #3 - MULTIPLE RIGHT-HAND SIDES ======" << std::endl;
+    
+    // 1. Prepare matrix 'A':
+    const int n = 5;
+    SparseComplexMatrix a(n, n);
+    a(0, 0) = dcomplex(2, -1);
+    a(0, 1) = dcomplex(3, 2);
+    a(1, 2) = dcomplex(5, -7);
+    a(1, 4) = dcomplex(3, 2);
+    a(2, 1) = dcomplex(-1, -1);
+    a(2, 2) = dcomplex(-3, -2);
+    a(2, 3) = dcomplex(2, 1);
+    a(3, 0) = dcomplex(0, 1);
+    a(3, 2) = dcomplex(1, 2);
+    a(4, 1) = dcomplex(4, 3);
+    a(4, 2) = dcomplex(-2, -1);
+    a(4, 4) = dcomplex(-1, 5);
+    a.finalize();
+    
+    //printInfoMatrix("A", a);
+    
+    // 2. Prepare independent term 'b':
+    SparseComplexMatrix b(n, 3);
+    b(0, 0) = dcomplex(  8,   3);  b(0, 1) = dcomplex( 33,   8);  b(0, 2) = dcomplex(  2,  -1);
+    b(1, 0) = dcomplex( 30, -11);  b(1, 1) = dcomplex( 70, -36);  b(1, 2) = dcomplex(  8,  -5);
+    b(2, 0) = dcomplex( -3,  -4);  b(2, 1) = dcomplex(-13, -14);  b(2, 2) = dcomplex( -3,  -2);
+    b(3, 0) = dcomplex(  3,   7);  b(3, 1) = dcomplex(  8,  22);  b(3, 2) = dcomplex(  1,   3);
+    b(4, 0) = dcomplex( -3,  28);  b(4, 1) = dcomplex(  2,  63);  b(4, 2) = dcomplex( -3,   4);
+    b.finalize();
+    
+    // 3. Prepare expected solution 'x_expc':
+    ComplexMatrix x(n, 3), x_expc(n, 3);
+    x_expc(0, 0) = 1;  x_expc(0, 1) =  6;  x_expc(0, 2) = 1;
+    x_expc(1, 0) = 2;  x_expc(1, 1) =  7;  x_expc(1, 2) = 0;
+    x_expc(2, 0) = 3;  x_expc(2, 1) =  8;  x_expc(2, 2) = 1;
+    x_expc(3, 0) = 4;  x_expc(3, 1) =  9;  x_expc(3, 2) = 0;
+    x_expc(4, 0) = 5;  x_expc(4, 1) = 10;  x_expc(4, 2) = 1;
+    
+    solveMumps(a, b, x);
+    
+    //x.print("Solution x");
+    
+    std::cout << TAG_INFO << "Error = " << (x - x_expc).norm() << "\n";
+    
+    return 0;
+}
+
+/**
  * Main function of the test of the SparseComplexMatrix class.
  */
 int main(int argc, char** argv) {
@@ -220,9 +333,12 @@ int main(int argc, char** argv) {
     //testFilling1();
     //testFilling2();
     //testHybridProduct();
-    testSolveUmfpack1();
-    testSolveUmfpack2();
-    testSolveUmfpack3();
+    //testSolveUmfpack1();
+    //testSolveUmfpack2();
+    //testSolveUmfpack3();
+    testSolveMumps1();
+    testSolveMumps2();
+    testSolveMumps3();
     
     return 0;
 }

@@ -34,6 +34,7 @@ class SparseComplexMatrix {
     std::vector<Triplet> triplet;  // Defines the list of triplets. Note that this vector is always sorted.
     int nrow;       // Number of rows of the sparse matrix.
     int ncol;       // Number of columns of the sparse matrix.
+    bool symmetric; // Flag indicating if the matrix is symmetric or not (within a certain tolerance).
     bool sorted;    // Flag indicating if the sparse matrix is sorted by finalize() method.
     
     public:
@@ -46,10 +47,11 @@ class SparseComplexMatrix {
     int getNcol() const;
     int64_t getNnz() const;
     double density() const;
-    void checkSorted(const std::string& name) const;
     void allocate(const int nnz);
+    bool isSymmetric() const;
     dcomplex& operator()(const int i, const int j);
     dcomplex get(const int i, const int j) const;
+    void checkSorted(const std::string& name) const;
     void finalize();
     
     // Print methods:
@@ -60,16 +62,18 @@ class SparseComplexMatrix {
     // Mathematical operations:
     double norm() const;
     SparseComplexMatrix conj() const;
-    bool isSymmetric() const;
+    //bool isSymmetric(const double tol = 1e-12) const;
     friend SparseComplexMatrix operator*(const dcomplex scalar, const SparseComplexMatrix& a);
     friend SparseComplexMatrix operator*(const SparseComplexMatrix& a, const dcomplex scalar);
     friend ComplexMatrix operator*(const SparseComplexMatrix& a, const ComplexMatrix& b);
     friend void solveUmfpack(const SparseComplexMatrix& a, const SparseComplexMatrix& b, ComplexMatrix& x);
+    friend void solveMumps(const SparseComplexMatrix& a, const SparseComplexMatrix& b, ComplexMatrix& x);
     
     // Private computational methods:
     private:
     
     void checkIndices(const int i, const int j) const;
+    void computeSymmetry();
     
 };
 

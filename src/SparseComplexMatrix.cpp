@@ -8,7 +8,8 @@
 #include "Color.hpp"
 #include "BaseTools.hpp"
 #include <suitesparse/umfpack.h>
-//#include <dmumps_c.h>
+#include "zmumps_c.h"  // MUMPS header for double precision complex arithmetic.
+#include "mpi.h"  // MUMPS requires MPI even if it is used in sequential.
 #include <algorithm>
 #include <fstream>
 
@@ -171,13 +172,58 @@ dcomplex SparseComplexMatrix::get(const int i, const int j) const {
 }
 
 /**
+ * Returns "true" is the matrix is symmetric, "false" otherwise.
+ * Argument "tol" is the tolerance over the relative difference.
+ * Typically, it should be of the order of the machine epsilon (1e-16) or larger.
+ * This method implicitly assumes that the matrix elements are already sorted and does not perform checking (this is why it should remain private).
+ */
+void SparseComplexMatrix::computeSymmetry() {
+    
+    if (nrow != ncol) {// If the matrix is non-square, then skip further calculations.
+        symmetric = false;
+        return;
+    }
+    const double tol = 1e-12;  // Tolerance over the relative error between A(i,j) and A(j,i).
+    dcomplex aji;  // Symmetric element.
+    
+    //auto start_sym = std::chrono::steady_clock::now();
+    
+    for (const Triplet& t : triplet) {// Loop over the triplets.
+        
+        if (t.i > t.j) {// Only perform the check in the lower triangle.
+            
+            aji = get(t.j, t.i);  // Get the symmetric element.
+            
+            if (std::abs(t.a - aji) + std::abs(t.a - aji) > tol*(std::abs(t.a.real()) + std::abs(t.a.imag()) + 1.)) {// Symmetry criterion with tolerance.
+                symmetric = false;
+                return;
+            }
+        }
+    }
+    
+    //double ctime_sym = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_sym).count();
+    //std::cout << TAG_INFO << "computeSymmetry(): Time = " << ctime_sym << " s.\n";
+    
+    symmetric = true;
+}
+
+/**
+ * Returns "true" is the matrix is symmetric, "false" otherwise.
+ */
+bool SparseComplexMatrix::isSymmetric() const {
+    checkSorted("isSymmetric()");
+    return symmetric;
+}
+
+/**
  * Finalize the sparse matrix by sorting the matrix elements in column-major ordering.
  */
 void SparseComplexMatrix::finalize() {
     if (not sorted) {// Only sort one time.
         std::sort(triplet.begin(), triplet.end());  // Sort is O(N*log(N)) in time.
             // Note that "sort()" implicitly uses the comparison operator<(t1,t2) defined before.
-        sorted = true; // Declare the vector "triplet" as sorted.
+        sorted = true; // Declare the vector "triplet" as sorted before computing the symmetry.
+        computeSymmetry(); // Determines if the matrix is symmetric, in principle O(N*log(N)) in time.
     }
 }
 
@@ -276,24 +322,6 @@ SparseComplexMatrix SparseComplexMatrix::conj() const {
 }
 
 /**
- * Returns "true" is the matrix is symmetric, "false" otherwise.
- */
-bool SparseComplexMatrix::isSymmetric() const {
-    
-    checkSorted("isSymmetric()"); // Check that the matrix is indeed sorted.
-    
-    if (nrow != ncol) return false;  // If the matrix is non-square, then skip further calculations.
-    
-    Triplet test;
-    
-    for (const Triplet& t : triplet) {// Loop over the triplets.
-        if (t.i > t.j && get(t.j, t.i) != t.a) return false;
-    }
-    
-    return true;
-}
-
-/**
  * Multiplication of a sparse matrix by a scalar factor.
  */
 SparseComplexMatrix operator*(const dcomplex scalar, const SparseComplexMatrix& a) {
@@ -338,6 +366,18 @@ ComplexMatrix operator*(const SparseComplexMatrix& a, const ComplexMatrix& b) {
         
     }
     return c;
+}
+
+/**
+ * Temporary function to print arrays. Used only for testing purposes (otherwise deprecated).
+ */
+template <typename T>
+void printArray(const std::string& name, const int n, const T* array) {
+    std::cout << TAG_INFO << name << " = [";
+    for (int i = 0; i < n; i++) {// Loop over the elements of the array.
+        std::cout << " " << array[i] << " ";
+    }
+    std::cout << "]\n";
 }
 
 /**
@@ -389,7 +429,7 @@ void solveUmfpack(const SparseComplexMatrix& a, const SparseComplexMatrix& b, Co
     auto pcol = new int32_t[a.ncol+1]();
     auto irow = new int32_t[nnz];
     auto real = new double[nnz];
-    auto imag = new double[nnz]; 
+    auto imag = new double[nnz];
     
     nnz = 0;  // Reset the number of nonzero to count them.
     int32_t jcol = 0;  // Current column index.
@@ -426,7 +466,7 @@ void solveUmfpack(const SparseComplexMatrix& a, const SparseComplexMatrix& b, Co
     void *symbolic, *numeric;  // Symbolic and numeric factorization of the sparse matrix.
     
     umfpack_zi_symbolic(a.nrow, a.ncol, pcol, irow, real, imag, &symbolic, control, info);  // Perform symbolic reording to minimize fill-in.
-    umfpack_zi_numeric(pcol, irow, real, imag, symbolic, &numeric, control, info); // Perform numericl LU factorization.
+    umfpack_zi_numeric(pcol, irow, real, imag, symbolic, &numeric, control, info); // Perform numerical LU factorization.
     umfpack_zi_free_symbolic(&symbolic); // Free the memory allocated by the symbolic factorization.
     
     auto breal = new double[b.getNrow()];
@@ -480,9 +520,114 @@ void solveMumps(const SparseComplexMatrix& a, const SparseComplexMatrix& b, Comp
     // 1. First check for possible errors in the input:
     checkSolverInput(a, b, x);
     
-    std::cout << TAG_WARN << "In solveMumps(): Not implemented yet !\n";
+    //int myid, argc = 0;
+    //char** argv{};
+    //MPI_Init(&argc, &argv);
+    //MPI_Comm_rank(MPI_COMM_WORLD, &myid);
     
-    // TODO: See p.121 of MUMPS manual: https://mumps-solver.org/doc/userguide_5.8.1.pdf  ......................
+    ZMUMPS_STRUC_C id;  // Declare a new MUMPS object.
+    id.comm_fortran = MPI_COMM_WORLD;
+    id.par = 1;  // Declares that the host is involved in the factorization and solve phases (id.par=1 for sequential solve).
+    id.sym = a.symmetric ? 2 : 0;  // Declares the symmetry of the matrix.
+    id.job = -1; // Declares that this call initializes an instance of the package.
+    zmumps_c(&id);
     
+    //====== Enter the sparse matrix A ======
+    #define ICNTL(I) icntl[(I)-1] // Macro such that indices match documentation.
+    id.ICNTL(5) = 0;  // Declare the use of assembled format (standard triplet format).
+    const int a_nnz  = a.symmetric ? (a.triplet.size() + a.nrow)/2 : a.triplet.size();
+    auto a_elem = new mumps_double_complex[a_nnz];
+    auto a_irow = new int[a_nnz];
+    auto a_jcol = new int[a_nnz];
+    
+    int nnz = 0;
+    for (const Triplet& t : a.triplet) {// Loop on the triplets in column-major order.
+        if (not a.symmetric || t.i >= t.j) {// If the matrix is symmetrix, then only retains the lower triangle (including diagonal).
+            a_irow[nnz] = t.i + 1;  // Note the use of Fortran 1-based indices.
+            a_jcol[nnz] = t.j + 1;
+            a_elem[nnz] = mumps_double_complex{t.a.real(), t.a.imag()};
+            nnz++;
+        }
+    }
+    
+    //std::cout << TAG_INFO << "solveMumps(): Allocated a_nnz=" << a_nnz << ", inserted nnz=" << nnz << "...\n";
+    
+    id.n   = a.nrow;
+    id.nnz = a_nnz;
+    id.irn = a_irow;
+    id.jcn = a_jcol;
+    id.a   = a_elem;
+    
+    //====== Enter the sparse right-hand side B ======
+    const int b_nnz  = b.triplet.size();
+    auto b_elem = new mumps_double_complex[b_nnz];
+    auto b_irow = new int[b_nnz];
+    auto b_pcol = new int[b.ncol+1];
+    
+    int jcol = 0; nnz = 0;
+    b_pcol[0] = 1;
+    for (const Triplet& t : b.triplet) {// Loop on the triplets in column-major order.
+        if (t.j != jcol) {
+            jcol = t.j;
+            b_pcol[jcol] = nnz + 1;  // Note the use of Fortran 1-based indices.
+        }
+        b_irow[nnz] = t.i + 1;  // Note the use of Fortran 1-based indices.
+        b_elem[nnz] = mumps_double_complex{t.a.real(), t.a.imag()};
+        nnz++;
+    }
+    b_pcol[b.ncol] = nnz + 1;
+    
+    //printArray("b_pcol", b.ncol+1, b_pcol);
+    
+    id.nrhs        = b.ncol;
+    id.lrhs        = b.nrow;
+    id.nz_rhs      = b_nnz;
+    id.rhs_sparse  = b_elem;
+    id.irhs_sparse = b_irow;
+    id.irhs_ptr    = b_pcol;
+    
+    //====== Solve the linear system A.X = B ======
+    id.rhs = new mumps_double_complex[x.getNrow() * x.getNcol()]; // Allocate space for the solution.
+    id.ICNTL(1)  = 0;  // Disable printing.
+    id.ICNTL(2)  = 0;  // Disable printing.
+    id.ICNTL(3)  = 0;  // Disable printing.
+    id.ICNTL(4)  = 0;  // Disable printing.
+    id.ICNTL(10) = 0;  // Declares no iterative refinement.
+    id.ICNTL(16) = 1;  // Sets the number of OpenMP threads to 1.
+    id.ICNTL(20) = 1;  // Declare sparse right-hand sides. Decision of exploiting sparsity of the RHS to accelerate the solution phase is done automatically.
+    id.ICNTL(28) = 1;  // Declares the sequential computation of the ordering.
+    
+    id.job = 6; // Declares the computational phase (analysis, factorization, solve).
+    zmumps_c(&id); // Call MUMPS solver (computationally intensive phase).
+    
+    if (id.infog[0] < 0) {// Check for possible errors.
+        std::string msg = "In solveMumps(): MUMPS failure. INFOG(1)=" + std::to_string(id.infog[0])
+                        + ", INFOG(2)=" + std::to_string(id.infog[1]) + ".";
+        throw std::runtime_error(msg);
+    }
+    
+    //====== Copy of the solution into X ======
+    const int x_nrow = x.getNrow();
+    mumps_double_complex elem;
+    for (int j = 0; j < x.getNcol(); j++) {// Loop over the columns of X.
+        for (int i = 0; i < x_nrow; i++) {// Loop over the rows of X.
+            elem = id.rhs[i + j*x_nrow];
+            x(i, j) = dcomplex(elem.r, elem.i);
+        }
+    }
+    
+    //====== Termination instructions ======
+    delete[] id.rhs; // Ensure the memory allocated by the solution is free.
+    id.job = -2;  // Terminates an instance of the package.
+    zmumps_c(&id);
+    
+    delete[] a_elem;
+    delete[] a_irow;
+    delete[] a_jcol;
+    delete[] b_elem;
+    delete[] b_irow;
+    delete[] b_pcol;
+    
+    //MPI_Finalize();
 }
 

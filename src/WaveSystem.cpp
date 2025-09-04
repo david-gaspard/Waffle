@@ -569,8 +569,7 @@ void WaveSystem::computeIOStates() {
     
     // Construct the input/output modes :
     const dcomplex kh2 = dcomplex(kh*kh, MEPS);
-    dcomplex klh;
-    double d2ev;
+    dcomplex d2pkh2, klh;
     int np;          // Number of points in the current opening.
     int jinput = 0;  // Current number of input modes.
     int joutput = 0; // Current number of output modes.
@@ -586,11 +585,12 @@ void WaveSystem::computeIOStates() {
             
             for (int j = 0; j < np; j++) {// Loop over the modes of U (columns of U).
                 
-                // Compute the effective longitudinal wavenumber in the input lead:
-                d2ev = laplacianEigenvalue(j, np);  // Get the j^th Laplacian eigenvalue for an operator of size "np".
-                klh = std::sqrt( (kh2 + d2ev) * ( 1. - (kh2 + d2ev)/4. ) );  // Compute the effective longitudinal wavenumber.
+                d2pkh2 = laplacianEigenvalue(j, np) + kh2;  // j^th eigenvalue of D_y^2 + (kh)^2 for an operator of size "np".
                 
-                if (std::abs(klh.real()) > std::abs(klh.imag())) {// If the mode is propagating.
+                if (d2pkh2.real() > 0.) {// If the mode is propagating.
+                    
+                    klh = std::sqrt( d2pkh2 * ( 1. - d2pkh2/4. ) );  // Compute the effective longitudinal wavenumber.
+                    
                     for (int i = 0; i < np; i++) {// Loop over the points in the opening (rows of U).
                         inputState(op.index.at(i), jinput) = u(i, j);
                     }
@@ -607,11 +607,12 @@ void WaveSystem::computeIOStates() {
             
             for (int j = 0; j < np; j++) {// Loop over the modes of U (columns of U).
                 
-                // Compute the effective longitudinal wavenumber in the output lead:
-                d2ev = laplacianEigenvalue(j, np);  // Get the j^th Laplacian eigenvalue for an operator of size "np".
-                klh = std::sqrt( (kh2 + d2ev) * ( 1. - (kh2 + d2ev)/4. ) );
+                d2pkh2 = laplacianEigenvalue(j, np) + kh2;  // j^th eigenvalue of D_y^2 + (kh)^2 for an operator of size "np".
                 
-                if (std::abs(klh.real()) > std::abs(klh.imag())) {// If the current mode is propagating.
+                if (d2pkh2.real() > 0.) {// If the mode is propagating.
+                    
+                    klh = std::sqrt( d2pkh2 * ( 1. - d2pkh2/4. ) );  // Compute the effective longitudinal wavenumber.
+                    
                     for (int i = 0; i < np; i++) {// Loop over the points in the opening (rows of U).
                         outputState(op.index.at(i), joutput) = u(i, j);
                     }
@@ -628,14 +629,21 @@ void WaveSystem::computeIOStates() {
     outputState.finalize();
     
     // Normalize the density of states:
-    dosinput  /= 2*PI*ninput; // WARN: Should not this be ninputprop ????
+    dosinput  /= 2*PI*ninput;  // Note that it is the total number of input/output modes (including evanescent modes).
     dosoutput /= 2*PI*noutput;
     
     // Compute the exact free density of states on a square lattice:
-    //const double khm4 = 4. - kh*kh;
-    //dosfree = (2./(PI*PI*khm4)) * ellipticK( kh*kh*(kh*kh - 8.)/(khm4*khm4) );
     const double mkh = 1. - kh*kh/4.;
     dosfree = ellipticK(1. - 1./(mkh*mkh))/(2.*PI*PI*mkh);
+    
+    if (dosinput > 3.*dosfree) {
+        std::cout << TAG_WARN << "DOSinput=" << dosinput << " is large, meaning that an input lead resonates. You may consider changing the number of input points...\n";
+        inputKlh.conj().print("inputKlh");
+    }
+    else if (dosoutput > 3.*dosfree) {
+        std::cout << TAG_WARN << "DOSoutput=" << dosoutput << " is large, meaning that an output lead resonates. You may consider changing the number of output points...\n";
+        outputKlh.conj().print("outputKlh");
+    }
     
     // Measure the build time for information:
     double ctime_build = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_build).count();
@@ -649,7 +657,8 @@ void WaveSystem::computeIOStates() {
 void WaveSystem::computeGreenFunction() {
     if (not computed) {// This function only does the computation if the flag "computed" is "false".
         //std::cout << TAG_INFO << "Solving the sparse system now..." << std::endl;
-        solveUmfpack(hamiltonian, inputState, green);  // Solve the system using UMFPACK (computationally intensive).
+        //solveUmfpack(hamiltonian, inputState, green); // Solve the system using UMFPACK sequentially (computationally intensive).
+        solveMumps(hamiltonian, inputState, green); // Solve the system using MUMPS sequentially (computationally intensive). MUMPS is faster than UMFPACK.
         computed = true;  // Declare the Green function as computed.
     }
 }

@@ -7,9 +7,15 @@ PROGNAME = waffle
 SRCLIST = $(shell find src/ -name "*.cpp" ! -name "Main.cpp")
 BINLIST = $(SRCLIST:src/%.cpp=bin/%.o)
 
+### MUMPS Settings ###
+MUMPS_DIR=/usr/lib/MUMPS_5.8.0
+MUMPS_INCL=-I$(MUMPS_DIR)/include -I$(MUMPS_DIR)/libseq
+MUMPS_LIBS=-L$(MUMPS_DIR)/lib -lzmumps -lmumps_common -lmetis -lpord -lesmumps -lscotch -lmpiseq -lgfortran
+## Note that -lgfortran should be loaded in the last position.
+
 CC=g++
-CFLAGS=-W -Wall -Wextra -std=c++17 -Isrc -Jbin -fopenmp -O2
-LIBS=-lblas -llapack -lumfpack 
+CFLAGS=-W -Wall -Wextra -std=c++17 $(MUMPS_INCL) -Isrc -Jbin -fopenmp -O2 
+LIBS=-lblas -llapack -lumfpack $(MUMPS_LIBS)
 
 all: directories $(PROGNAME)
 

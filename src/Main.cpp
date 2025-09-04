@@ -25,12 +25,11 @@
  * DONE: (7)  In Main: Add histogram of transmission eigenvalues. Simply save all raw eigenvalues in a CSV file (each row per disorder realization)...
  * DONE: (8)  Write "plot_histo.py" to plot the histogram of a list of values in given interval [Tmin, Tmax] using Nbins.
  * DONE: (9)  In WaveSystem: Add checkResidual() to verify that the linear system is correctly solved...
+ * DONE: (10) In WaveSystem: Maybe remove the evanescent modes from "inputState" and "outputState" because they always give zero transmission eigenvalues...
+ * DONE: (11) In SparseComplexMatrix: Implement solveMumps() (no iterative refinement) and compare performance with solveUmfpack()...
  * 
- * (10) In WaveSystem: Maybe remove the evanescent modes from "inputState" and "outputState" because they always give zero transmission eigenvalues...
- * 
- * 
- * (11) In SparseComplexMatrix: Implement solveMumps() (with nested dissection, but no iterative refinement) and compare performance with solveUmfpack()...
  * (12) In Main: Add parallelized taskTransmissionOMP()...
+ * 
  * DONE: (13) In plot_map.py: Fix the partial read bug with the CSV reader which occurs when it is called by the C++ program...
  * (14) Create script "plot_cut.py" to plot the intensity profile along a cut. A straight line should do the job...
  * (15) In SquareMesh: Create addImage(filename) to import PNG in order to facilitate the mesh creation...
@@ -69,13 +68,10 @@ Context createWaveguide() {
     // Construct the mesh:
     SquareMesh mesh;
     mesh.addRectangle(0, length, 0, width, BND_MIRROR);
-    //mesh.removeDisk(length/3, width/3, 2.5);
     
     // Setup boundary conditions:
     mesh.setBoundaryRectangle(0, 0, 0, width, DIR_WEST, BND_INPUT);
-    //mesh.setBoundaryRectangle(0, 0, width/4, 3*width/4, DIR_WEST, BND_INPUT);
     mesh.setBoundaryRectangle(length, length, 0, width, DIR_EAST, BND_OUTPUT);
-    //mesh.setBoundaryRectangle(length, length, width/4, 3*width/4, DIR_EAST, BND_OUTPUT);
     
     mesh.finalize();
     
@@ -501,10 +497,10 @@ int main(int argc, char** argv) {
     ctx.sys.printSummary();
     
     // Checking operations:
+    ctx.sys.infoHamiltonian();
     //ctx.sys.setDisorder(1);
     //ctx.sys.checkResidual();
     //ctx.sys.checkUnitarity(true);
-    //ctx.sys.infoHamiltonian();
     //ctx.sys.plotMesh();
     //ctx.sys.plotInputState();
     //ctx.sys.plotOutputState();
