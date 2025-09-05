@@ -7,8 +7,41 @@ import numpy as np
 import matplotlib.pyplot as mplt
 import matplotlib.colors as mcol
 import compile_tikz
-#import plot_map
 
+def comparePoint(p1, p2):
+    """
+    Comparison function.
+    Return True if point "p1" is located before "p2" assuming the points are stored in column-major ordering.
+    """
+    p1x = int(p1['x'])
+    p1y = int(p1['y'])
+    p2x = int(p2['x'])
+    p2y = int(p2['y'])
+    return p1x < p2x or (p1x == p2x and p1y > p2y)
+
+def find_binary_search(data, x, y):
+    """
+    Find the point at position (x, y) (couple of integers) in the "data" and return the index.
+    This function uses binary search assuming that the points in "data" are sorted in column-major ordering
+    (i.e., they satisfy the comparePoint() function above).
+    """
+    ileft = 0
+    iright = len(data) - 1
+    ptarget = {'x': str(x), 'y': str(y)}
+    
+    while ileft <= iright:
+        imid = (ileft + iright)//2
+        pmid = data[imid]
+        
+        if not comparePoint(pmid, ptarget) and not comparePoint(ptarget, pmid):
+            return imid
+        
+        if comparePoint(pmid, ptarget):
+            ileft = imid + 1
+        else:
+            iright = imid - 1
+    
+    return len(data)
 
 def interpolate(data, column_name, x, y):
     """
@@ -16,14 +49,12 @@ def interpolate(data, column_name, x, y):
     """
     npoint = len(data)  ## Total number of points of the mesh.
     
-    ## 1. Find the theoretical point in the lower left corner:
+    ## 1. Determine the position of the theoretical point in the lower left corner:
     x00 = int(np.floor(x))
     y00 = int(np.floor(y))
     
-    ## 2. Find the corresponding values in the data (NB: this operation is O(N), but optimizable to O(log(N)) using binary search):
-    i00 = 0
-    while (i00 != npoint and not (int(data[i00]['x']) == x00 and int(data[i00]['y']) == y00)):
-        i00 += 1
+    ## 2. Find the corresponding point in the data using binary search:
+    i00 = find_binary_search(data, x00, y00)
     
     if (i00 == npoint):
         return 0. ## If the point is not found, then returns zero.
@@ -149,7 +180,6 @@ def plot_cut(args):
     compile_tikz.compile_tikz(tikz_file) ## Compile the TikZ file.
     
     ## TODO: If time permits, maybe also show the corresponding cut from above using plot_map.py...
-    
     return 0
 
 
