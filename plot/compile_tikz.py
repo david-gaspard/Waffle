@@ -6,9 +6,7 @@
 ## This file is also callable as a script. When called, it compiles the given TikZ files.
 ## USAGE : ./plot/compile_tikz.py FILE_1.tikz [ FILE_2.tikz FILE_3.tikz ]
 ## FILENAME_TIKZ = Path of the TikZ file to be compiled by the present script.
-import sys
-import os
-import shutil
+import sys, os, re, shutil
 
 MY_COPYRIGHT = "(c) 2025 David GASPARD (ORCID 0000-0002-4449-8782) <david.gaspard@espci.fr>"
 
@@ -74,8 +72,8 @@ LATEX_PREAMBLE = r"""\usepackage[utf8]{inputenc}
 		axis line style={thin},
 		every axis title/.style={
             at={(0.5, 1)},
-            above,
-            align=center,
+            above, align=center,
+            text width=0.8\textwidth,
         },
         legend style={
             thin,
@@ -166,16 +164,33 @@ def can_overwrite(filename):
             return False
     return True
 
-def get_header_comment(filename, comment_char):
+def get_header(fp, comment_char):
     """
-    Returns the first commented lines of a file assuming the given comment character.
+    Returns the first commented lines of a file "fp" assuming the given comment character.
     """
+    fp.seek(0)  ## Rewind the file to look for the value.
     res = ""
-    with open(filename, 'r') as f:
-        for line in f:
-            if line.startswith(comment_char):
-                res += line
-    return res
+    for line in fp:
+        if line.startswith(comment_char):
+            res += line
+    return res.strip()
+
+def get_value_in_string(key, string):
+    """
+    Find some value named "key" in the given "string".
+    """
+    ##print(TAG_INFO + "STRING: " + string)
+    val = None  ## Default value
+    res = re.search(key + "=([^, ]*)[, ]", string)
+    
+    if (res != None):
+        val = res.group(1)
+        ##print(TAG_INFO + "Found value " + key + "=" + str(val))
+    else:
+        print(TAG_WARN + "Value of '" + key + "' not found, using default value (" + key + "=" + str(val) + ")...")
+    
+    return val
+
 
 def main(args):
     """

@@ -6,7 +6,7 @@
 ## This optimization allows to use the path decoration in TikZ, hence improving the rendering.
 import sys, os, datetime, csv
 import numpy as np
-import compile_tikz
+import compile_tikz as ct
 
 BOUNDARY_STYLE = """mirror/.style={black},
     input/.style={red, decoration={markings, mark=between positions 0 and 1 step 1.3mm with {\\fill (-0.5mm, 1mm) -- (0mm, 0mm) -- (0.5mm, 1mm) --cycle;}, pre length=0.5mm, post length=0.5mm}, postaction={decorate}},
@@ -28,7 +28,7 @@ def merge_segments(segments):
     copied = len(segments) * [False]  ## Mask indicating if the segment has been treated.
     nmerge = 0  ## Total number of merges.
     
-    ##print(compile_tikz.TAG_INFO + "Number of segments before merge =", len(segments))
+    ##print(ct.TAG_INFO + "Number of segments before merge =", len(segments))
     
     ## 1. Merge segments:
     for i in range(len(segments)):
@@ -49,7 +49,7 @@ def merge_segments(segments):
         if (copied[i]):
             del segments[i]
     
-    ##print(compile_tikz.TAG_INFO + "Number of merges =", nmerge)
+    ##print(ct.TAG_INFO + "Number of merges =", nmerge)
     
     return nmerge
 
@@ -98,7 +98,7 @@ def simplify_segments(segments):
                 del s[i]
                 ndel += 1
     
-    ##print(compile_tikz.TAG_INFO + "Simplification result: Deleted", ndel, "over", npoint, "points (", (100.*ndel/npoint), "%).")
+    ##print(ct.TAG_INFO + "Simplification result: Deleted", ndel, "over", npoint, "points (", (100.*ndel/npoint), "%).")
     
     return ndel
 
@@ -162,8 +162,8 @@ def plot_mesh(args):
     """
     ## Check if the number of arguments is correct:
     if (len(args) != 2):
-        print(compile_tikz.TAG_ERROR + "No input file, doing nothing...")
-        print(compile_tikz.TAG_USAGE + args[0] + " MESH_FILE")
+        print(ct.TAG_ERROR + "No input file, doing nothing...")
+        print(ct.TAG_USAGE + args[0] + " MESH_FILE")
         return 1
     
     mesh_file = args[1]
@@ -172,10 +172,11 @@ def plot_mesh(args):
     try:
         fp = open(mesh_file, 'r')
     except IOError as e:
-        print(compile_tikz.TAG_ERROR + "Field file '" + mesh_file + " not found, aborting now...")
+        print(ct.TAG_ERROR + "Field file '" + mesh_file + " not found, aborting now...")
         return 1
     
     data = list(csv.DictReader((line for line in fp if not line.startswith('%')), skipinitialspace=True))
+    data_header = ct.get_header(fp, '%')
     
     ## Extract the bounds of the mesh:
     xmesh = np.asarray([int(p['x']) for p in data], dtype=int)
@@ -186,11 +187,12 @@ def plot_mesh(args):
     ymax = ymesh.max()
     
     tikz_code = """%% Generated on {timestamp} by {my_program} {my_copyright}
+{data_header}
 \\begin{{tikzpicture}}[%
     {boundary_style},
 ]%
 \\begin{{axis}}[%
-    title={{\\detokenize{{{mesh_file}}}}},
+    title={{{title}}},
     xlabel={{{xlabel}}},
     ylabel={{{ylabel}}},
     xmin={xmin}, xmax={xmax},
@@ -203,8 +205,9 @@ def plot_mesh(args):
 \\end{{tikzpicture}}%""".format(
         timestamp = datetime.datetime.now().astimezone().strftime("%F at %T %z"),
         my_program = args[0],
-        my_copyright = compile_tikz.MY_COPYRIGHT,
-        mesh_file = mesh_file,
+        my_copyright = ct.MY_COPYRIGHT,
+        data_header = data_header,
+        title = "\\textbf{Cmd:} \\detokenize{"+ " ".join(args) + "}",
         xlabel = "$x$",
         ylabel = "$y$",
         xmin   = xmin-0.5,
@@ -217,9 +220,9 @@ def plot_mesh(args):
     
     ## Export the TikZ code to a file and compile it:
     tikz_file = file_path + '.tikz'
-    print(compile_tikz.TAG_INFO + "Writing TikZ file: '" + tikz_file + "'...")
+    print(ct.TAG_INFO + "Writing TikZ file: '" + tikz_file + "'...")
     open(tikz_file, 'w').write(tikz_code)
-    compile_tikz.compile_tikz(tikz_file) ## Compile the TikZ file.
+    ct.compile_tikz(tikz_file) ## Compile the TikZ file.
     
     fp.close()
     return 0

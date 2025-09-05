@@ -2,11 +2,11 @@
 #-*- coding: utf-8 -*-
 ## Created on 2025-07-17 at 12:48:24 CEST by David Gaspard (ORCID 0000-0002-4449-8782) <david.gaspard@espci.fr> under the MIT License.
 ## Python script to plot a scalar field defined over a square lattice with holes. The input data must have the form [x, y, f(x, z)].
-import sys, os, re, datetime, csv
+import sys, os, datetime, csv
 import numpy as np
 import matplotlib.pyplot as mplt
 import matplotlib.colors as mcol
-import compile_tikz
+import compile_tikz as ct
 import plot_mesh
 
 ## Create the 'sunset' colormap, a luminance-linearized colormap originally created by David Gaspard in June 2024:
@@ -63,7 +63,7 @@ def colormap_to_tikz_code(cmap, nsample, mode):
     Returns a TikZ code version of the given colormap "cmap" using a given number of samples "nsample".
     Example output: 'colormap={temperature}{rgb255=(0,0,128) rgb255=(0,0,255) rgb255=(255,255,255) rgb255=(255,0,0) rgb255=(128,0,0)}'
     """
-    ##print(compile_tikz.TAG_INFO + "cmap.name =", cmap.name, ", cmap.N =", cmap.N, ", cmap(0.5) =", cmap(0.5))
+    ##print(ct.TAG_INFO + "cmap.name =", cmap.name, ", cmap.N =", cmap.N, ", cmap(0.5) =", cmap(0.5))
     
     string = "colormap={" + cmap.name + "}{"
     
@@ -79,30 +79,6 @@ def colormap_to_tikz_code(cmap, nsample, mode):
     
     return string
 
-def find_value_in_header(key, fp):
-    """
-    Find some value named "key" in the header of a CSV data file "fp".
-    The file is supposed to be already opened.
-    """
-    val = None  ## Default value
-    found = False
-    fp.seek(0)  ## Rewind the file to look for the value.
-    for line in fp:
-        if (line.startswith('%')):
-            res = re.search(key + "=([^, ]*)[, ]", line)
-            if (res != None):
-                val = res.group(1)
-                found = True
-                break
-        else:
-            break
-    if (not found):
-        print(compile_tikz.TAG_WARN + "Value of '" + key + "' not found, using default value (" + key + "=" + str(val) + ")...")
-    #else:
-    #    print(compile_tikz.TAG_INFO + "Found value " + key + "=" + str(val))
-    
-    return val
-
 def plot_map(args):
     """
     Plots the given component args[1]='column_name' of the given CSV file args[2]='field_file'.
@@ -110,8 +86,8 @@ def plot_map(args):
     """
     ## Check if the number of arguments is correct:
     if (len(args) != 4):
-        print(compile_tikz.TAG_ERROR + "Invalid number of arguments, doing nothing...")
-        print(compile_tikz.TAG_USAGE + args[0] + " MODE(lin|log) COLUMN_NAME FIELD_FILE")
+        print(ct.TAG_ERROR + "Invalid number of arguments, doing nothing...")
+        print(ct.TAG_USAGE + args[0] + " MODE(lin|log) COLUMN_NAME FIELD_FILE")
         return 1
     
     mode = args[1]  ## Coloring mode ("lin" or "log").
@@ -122,10 +98,12 @@ def plot_map(args):
     try:
         fp = open(field_file, 'r')
     except IOError as e:
-        print(compile_tikz.TAG_ERROR + "Field file '" + field_file + "' not found, aborting now...")
+        print(ct.TAG_ERROR + "Field file '" + field_file + "' not found, aborting now...")
         return 1
     
     data = list(csv.DictReader((line for line in fp if not line.startswith('%')), skipinitialspace=True))
+    data_header = ct.get_header(fp, '%')
+    holscat = float(ct.get_value_in_string("h/lscat", data_header))  ## Extract the ratio h/lscat.
     
     ## Find out the bounds of the system:
     point = np.asarray([(int(p['x']), int(p['y'])) for p in data], dtype=int)
@@ -142,7 +120,7 @@ def plot_map(args):
         i = ymax - int(p['y'])
         j = int(p['x']) - xmin
         matrix[i, j] = float(p[column_name])
-        ##print(compile_tikz.TAG_INFO + "matrix[", i, ",", j, "] = ", float(p[column_name]))
+        ##print(ct.TAG_INFO + "matrix[", i, ",", j, "] = ", float(p[column_name]))
     
     matrix = np.ma.array(matrix, mask=np.isnan(matrix))  ## Use a mask to escape nan values.
     if (mode == "log"):
@@ -160,18 +138,11 @@ def plot_map(args):
     vmax = matrix.max()
     norm = mcol.Normalize(vmin=vmin, vmax=vmax)
     image = cmap(norm(matrix)) ## Create the bitmap image.
-    ##print(compile_tikz.TAG_INFO + "vmin = ", vmin, ", vmax = ", vmax)
+    ##print(ct.TAG_INFO + "vmin = ", vmin, ", vmax = ", vmax)
     
     ##pre, ext = os.path.splitext(field_file)
     bitmap_file = file_path + '_map.png'
     mplt.imsave(bitmap_file, image)  ## Save the raw pixel-constrained bitmap to a PNG file.
-    
-    ## Extract the ratio h/lscat:
-    holscat = float(find_value_in_header("h/lscat", fp))
-    
-    ## Import the header with essential information on the simulation:
-    with open(field_file, 'r') as f:
-        data_header = "".join([l for l in f if l.startswith("%")]).strip()
     
     tikz_code = """%% Generated on {timestamp} by {my_program} {my_copyright}
 {data_header}
@@ -200,9 +171,9 @@ def plot_map(args):
 \end{{tikzpicture}}%""".format(#
         timestamp = datetime.datetime.now().astimezone().strftime("%F at %T %z"),
         my_program = args[0],
-        my_copyright = compile_tikz.MY_COPYRIGHT,
+        my_copyright = ct.MY_COPYRIGHT,
         data_header = data_header,
-        title  = "\\detokenize{" + field_file + "}\\\\ \\detokenize{"+ column_name + "}",
+        title = "\\textbf{Cmd:} \\detokenize{"+ " ".join(args) + "}",
         xlabel = "$x/\\ell$",
         ylabel = "$y/\\ell$",
         holscat = holscat,
@@ -220,9 +191,9 @@ def plot_map(args):
     
     ## Export the TikZ code to a file and compile it:
     tikz_file = file_path + '.tikz'
-    print(compile_tikz.TAG_INFO + "Writing TikZ file: '" + tikz_file + "'...")
+    print(ct.TAG_INFO + "Writing TikZ file: '" + tikz_file + "'...")
     open(tikz_file, 'w').write(tikz_code)
-    compile_tikz.compile_tikz(tikz_file) ## Compile the TikZ file.
+    ct.compile_tikz(tikz_file) ## Compile the TikZ file.
     
     fp.close()
     return 0

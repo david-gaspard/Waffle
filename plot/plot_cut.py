@@ -2,11 +2,9 @@
 #-*- coding: utf-8 -*-
 ## Created on 2025-09-04 at 18:53:19 CEST by David Gaspard (ORCID 0000-0002-4449-8782) <david.gaspard@espci.fr> under the MIT License.
 ## Python script to plot a cut through a 2D scalar field defined over a square lattice. The input data must have the form [x, y, f(x, z)].
-import sys, os, re, datetime, csv
+import sys, os, datetime, csv
 import numpy as np
-import matplotlib.pyplot as mplt
-import matplotlib.colors as mcol
-import compile_tikz
+import compile_tikz as ct
 
 def comparePoint(p1, p2):
     """
@@ -104,8 +102,8 @@ def plot_cut(args):
     """
     ## Check if the number of arguments is correct:
     if (len(args) != 7):
-        print(compile_tikz.TAG_ERROR + "Invalid number of arguments, doing nothing...")
-        print(compile_tikz.TAG_USAGE + args[0] + " COLUMN_NAME AX AY BX BY FIELD_FILE")
+        print(ct.TAG_ERROR + "Invalid number of arguments, doing nothing...")
+        print(ct.TAG_USAGE + args[0] + " COLUMN_NAME AX AY BX BY FIELD_FILE")
         return 1
     
     column_name = args[1]  ## Interpret arg #1 as the name of the column in the field file.
@@ -117,14 +115,12 @@ def plot_cut(args):
     try:
         fp = open(field_file, 'r')
     except IOError as e:
-        print(compile_tikz.TAG_ERROR + "Field file '" + field_file + "' not found, aborting now...")
+        print(ct.TAG_ERROR + "Field file '" + field_file + "' not found, aborting now...")
         return 1
     
     data = list(csv.DictReader((line for line in fp if not line.startswith('%')), skipinitialspace=True))
-    
-    ## Import the header with essential information on the simulation:
-    with open(field_file, 'r') as f:
-        data_header = "".join([l for l in f if l.startswith("%")]).strip()
+    data_header = ct.get_header(fp, '%')
+    holscat = float(ct.get_value_in_string("h/lscat", data_header))  ## Extract the ratio h/lscat.
     
     ## Construct the cross-sectional cut using bilinear interpolation:
     L = np.linalg.norm(a - b)  ## Length of the path.
@@ -139,35 +135,40 @@ def plot_cut(args):
         cut[i, 1] = f
     
     ## Write the cut data in a string:
+    linelen = 3  ## Number of points on each line (arbitrary but not too large).
     cut_string = ""
     for i in range(nsub+1):
         cut_string += "(" + str(cut[i, 0]) + ", " + str(cut[i, 1]) + ") "
+        if (i%linelen == linelen-1):
+            cut_string += "\n\t"
     
     ## Write the TikZ code and compile the result:
     tikz_code = """%% Generated on {timestamp} by {my_program} {my_copyright}
 {data_header}
 \\begin{{tikzpicture}}%
 \\begin{{axis}}[%
-    title={{\\detokenize{{{data_file}}}}},
+    title={{{title}}},
     xlabel={{{xlabel}}},
-    ylabel={{\\detokenize{{{ylabel}}}}},
+    ylabel={{{ylabel}}},
     xmin={xmin}, xmax={xmax},
+    xticklabel={{\\pgfmathparse{{{holscat}*\\tick}}$\\pgfmathprintnumber[fixed relative, precision=3]{{\\pgfmathresult}}$}}, %% Rescale ticks to get x/lscat = (x/h) * (h/lscat), with h/lscat={holscat}.
     unbounded coords=jump,  %% Discard NaN's and negative entries.
     clip marker paths=true, %% Clips the marks out of the axis frame.
     clip mode=individual,   %% Ensure the marks do not overlay the other curves.
 ]%
-\\addplot[black, thick] coordinates {{%% 
-    {cut_string}
+\\addplot[black, thick, line join=bevel] coordinates {{%% 
+\t{cut_string}
 }};
 \\end{{axis}}%
 \\end{{tikzpicture}}%""".format(
         timestamp = datetime.datetime.now().astimezone().strftime("%F at %T %z"),
         my_program = args[0],
-        my_copyright = compile_tikz.MY_COPYRIGHT,
+        my_copyright = ct.MY_COPYRIGHT,
         data_header = data_header,
-        data_file = field_file,
-        xlabel = "$x$",
-        ylabel = column_name,
+        title  = "\\textbf{Cmd:} \\detokenize{"+ " ".join(args) + "}",
+        xlabel = "$x/\\ell$",
+        ylabel = "\\detokenize{" + column_name + "}",
+        holscat = holscat,
         xmin   = cut[0, 0],
         xmax   = cut[nsub, 0],
         cut_string = cut_string
@@ -175,9 +176,9 @@ def plot_cut(args):
     
     ## Export the TikZ code to a file and compile it:
     tikz_file = file_path + '_cut.tikz'
-    print(compile_tikz.TAG_INFO + "Writing TikZ file: '" + tikz_file + "'...")
+    print(ct.TAG_INFO + "Writing TikZ file: '" + tikz_file + "'...")
     open(tikz_file, 'w').write(tikz_code)
-    compile_tikz.compile_tikz(tikz_file) ## Compile the TikZ file.
+    ct.compile_tikz(tikz_file) ## Compile the TikZ file.
     
     ## TODO: If time permits, maybe also show the corresponding cut from above using plot_map.py...
     return 0

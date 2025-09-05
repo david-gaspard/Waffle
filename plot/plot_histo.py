@@ -4,7 +4,7 @@
 ## Python script to plot the histogram of the sample data stored in a CSV file.
 import sys, os, datetime
 import numpy as np
-import compile_tikz
+import compile_tikz as ct
 
 def plot_histo(args):
     """
@@ -12,8 +12,8 @@ def plot_histo(args):
     """
     ## Check if the number of arguments is correct:
     if (len(args) != 2):
-        print(compile_tikz.TAG_ERROR + "No input file, doing nothing...")
-        print(compile_tikz.TAG_USAGE + args[0] + " SAMPLE_FILE")
+        print(ct.TAG_ERROR + "No input file, doing nothing...")
+        print(ct.TAG_USAGE + args[0] + " SAMPLE_FILE")
         return 1
     
     sample_file = args[1]
@@ -24,15 +24,15 @@ def plot_histo(args):
     samples = np.genfromtxt(sample_file, delimiter=",", comments="%")
     samples = samples[1:, :]
     #end = time.time()
-    #print(compile_tikz.TAG_INFO + "File imported in", end - start, "s.")
+    #print(ct.TAG_INFO + "File imported in", end - start, "s.")
     
     #print(samples[0:6, 0:6])
     nsample = samples.size
-    #print(compile_tikz.TAG_INFO + "Found", nsample, "samples...")
+    #print(ct.TAG_INFO + "Found", nsample, "samples...")
     
     ## Import the header with essential information on the simulation:
-    with open(sample_file, 'r') as f:
-        data_header = "".join([l for l in f if l.startswith("%")]).strip()
+    with open(sample_file, 'r') as fp:
+        data_header = ct.get_header(fp, '%')
     
     ## Set up the histogram:
     xmin = 0.  ## Lower bound on the samples.
@@ -48,9 +48,12 @@ def plot_histo(args):
     tavg = np.mean(samples)  ## Compute the average transmission probability (to adjust the bimodal law).
     
     ## Write the histogram data string:
+    linelen = 3  ## Number of points on each line (arbitrary but not too large).
     histo_string = ""
     for i in range(histo[0].size):
         histo_string += "(" + str(funbin(i+0.5)) + ", " + str(histo[0][i]) + ") "
+        if (i%linelen == linelen-1):
+            histo_string += "\n\t"
     
     ## Write the TikZ code:
     tikz_code = """%% Generated on {timestamp} by {my_program} {my_copyright}
@@ -58,7 +61,7 @@ def plot_histo(args):
 \\begin{{tikzpicture}}%
 \\pgfmathsetmacro\\tavg{{{tavg}}}%% Average transmission, Tavg ~ 1/[1 + (2/pi) * (L/lscat)]
 \\begin{{axis}}[%
-    title={{\\detokenize{{{data_file}}}}},
+    title={{{title}}},
     xlabel={{{xlabel}}},
     ylabel={{{ylabel}}},
     xmin={xmin}, xmax={xmax},
@@ -70,15 +73,15 @@ def plot_histo(args):
 ]%
 \\addplot[black!30, smooth, domain=0.001:0.999, samples=64] ({{sin(90*\\x)^2}}, {{\\tavg/(2 * sin(90*\\x)^2 * cos(90*\\x))}}); %% Plot the bimodal distribution.
 \\addplot[mark=*, only marks, mark size=0.8] coordinates {{%% 
-    {histo_string}
+\t{histo_string}
 }};
 \\end{{axis}}%
 \\end{{tikzpicture}}%""".format(
         timestamp = datetime.datetime.now().astimezone().strftime("%F at %T %z"),
         my_program = args[0],
-        my_copyright = compile_tikz.MY_COPYRIGHT,
+        my_copyright = ct.MY_COPYRIGHT,
         data_header = data_header,
-        data_file = sample_file,
+        title = "\\textbf{Cmd:} \\detokenize{"+ " ".join(args) + "}",
         xlabel = "Transmission eigenvalue $T$",
         ylabel = "Distribution $\\rho(T)$",
         xmin   = 0,
@@ -89,9 +92,9 @@ def plot_histo(args):
     
     ## Export the TikZ code to a file and compile it:
     tikz_file = file_path + '.tikz'
-    print(compile_tikz.TAG_INFO + "Writing TikZ file: '" + tikz_file + "'...")
+    print(ct.TAG_INFO + "Writing TikZ file: '" + tikz_file + "'...")
     open(tikz_file, 'w').write(tikz_code)
-    compile_tikz.compile_tikz(tikz_file) ## Compile the TikZ file.
+    ct.compile_tikz(tikz_file) ## Compile the TikZ file.
     
     return 0
 
