@@ -122,7 +122,7 @@ def plot_map(args):
     try:
         fp = open(field_file, 'r')
     except IOError as e:
-        print(compile_tikz.TAG_ERROR + "Field file '" + field_file + " not found, aborting now...")
+        print(compile_tikz.TAG_ERROR + "Field file '" + field_file + "' not found, aborting now...")
         return 1
     
     data = list(csv.DictReader((line for line in fp if not line.startswith('%')), skipinitialspace=True))
