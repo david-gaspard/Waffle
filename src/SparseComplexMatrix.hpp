@@ -57,7 +57,8 @@ class SparseComplexMatrix {
     // Print methods:
     void printSummary(const std::string& name) const;
     void print(const std::string& name) const;
-    void saveImage(const std::string& filename) const;
+    void savePNG(const std::string& filename) const;
+    void savePPM(const std::string& filename) const;
     
     // Mathematical operations:
     double norm() const;

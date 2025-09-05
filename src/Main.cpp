@@ -30,11 +30,11 @@
  * DONE: (12) In WaveSystem: Maybe remove the evanescent modes from "inputState" and "outputState" because they always give zero transmission eigenvalues...
  * DONE: (13) In SparseComplexMatrix: Implement solveMumps() (no iterative refinement) and compare performance with solveUmfpack()...
  * DONE: (14) Arthur 2025-09-04: Implement the average intensity Ibar(r) without wavefront shaping...
+ * DONE: (15) Create script "plot_cut.py" to plot the intensity profile along a cut. A straight line should do the job...
+ * DONE: (16) In SparseComplexMatrix: Improve plotImage() to export directly a PNG image instead of a heavy PPM file.
  * 
- * (15) Create script "plot_cut.py" to plot the intensity profile along a cut. A straight line should do the job...
+ * TODO: (17) In SquareMesh: Create addImage(filename) to import PNG in order to facilitate the mesh creation...
  * 
- * (16) In SquareMesh: Create addImage(filename) to import PNG in order to facilitate the mesh creation...
- * (17) In SparseComplexMatrix: Improve plotImage() to export directly a PNG image instead of a heavy PPM file.
  * (18) Arthur 2025-09-04: For the paper, come back with the double waveguide case (with/without absorber), and compute the eigenstate profile
  *      and the transmission eigenvalue distribution. Test changing the numerical aperture of each of the guides...
  * (19) Arthur 2025-09-04: What happens if we add a non-scattering region in the center of the waveguide ?
@@ -65,8 +65,8 @@ struct Context {
  */
 Context createWaveguide() {
     
-    const int length = 300;   // Number of points in the longitudinal direction, L/h. Default: 150. Better to reach length=width=300 with kh=0.5.
-    const int width  = 300;   // Number of points in the transverse direction, W/h. Default: 150. 
+    const int length = 150;   // Number of points in the longitudinal direction, L/h. Better to reach length=width=1000 with kh=1.
+    const int width  = 150;   // Number of points in the transverse direction, W/h.
     
     const double dscat = 8.5;  // Scattering depth, L/lscat. Default: dscat=8.5 (in order to get approximately dscat_eff=10).
     const double dabso = 0.;   // Absorption depth, L/labso.
@@ -551,11 +551,11 @@ int main(int argc, char** argv) {
     //ctx.sys.plotGreenFunction();
     //ctx.sys.plotTransmissionStates();
     
-    const int nseed = 100; // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
+    //const int nseed = 100; // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
     
     //taskTransmissionSerial(ctx.sys, ctx.trange, nseed);
     //taskTransmissionOMP(ctx.sys, ctx.trange, nseed);
-    taskAverageIntensitySerial(ctx.sys, nseed);
+    //taskAverageIntensitySerial(ctx.sys, nseed);
     
     return 0;
 }

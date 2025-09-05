@@ -15,7 +15,7 @@ MUMPS_LIBS=-L$(MUMPS_DIR)/lib -lzmumps -lmumps_common -lmetis -lpord -lesmumps -
 
 CC=g++
 CFLAGS=-W -Wall -Wextra -std=c++17 $(MUMPS_INCL) -Isrc -Jbin -fopenmp -O2
-LIBS=-lblas -llapack -lumfpack $(MUMPS_LIBS)
+LIBS=-lblas -llapack -lumfpack $(MUMPS_LIBS) -lpng
 
 all: directories $(PROGNAME)
 

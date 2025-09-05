@@ -1,13 +1,17 @@
 /****
- * @date Created on 2025-08-12 at 11:07:41 CEST
+ * @date Created on 2025-09-05 at 19:15:57 CEST
  * @author David Gaspard (ORCID 0000-0002-4449-8782) <david.gaspard@espci.fr>
  * @copyright This program is distributed under the MIT License.
- * @file C++ code providing coloring utilities.
+ * @file C++ code providing color conversion tools.
  ***/
 #include "Color.hpp"
 
+/**************************************************************************************************
+ * COLOR MANAGEMENT AND CONVERSION
+ **************************************************************************************************/
+
 /**
- * Convert the given RGB values in the interval [0, 1] to standard 8-bit RGB color.
+ * Convert the given RGB primaries in the interval [0, 1] to standard 8-bit RGB color.
  */
 Color RGBColor(double red, double green, double blue) {
     

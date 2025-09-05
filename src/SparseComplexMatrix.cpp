@@ -5,7 +5,7 @@
  * @file C++ code providing the implementation for the SparseComplexMatrix object.
  ***/
 #include "SparseComplexMatrix.hpp"
-#include "Color.hpp"
+#include "Image.hpp"
 #include "BaseTools.hpp"
 #include <suitesparse/umfpack.h>
 #include <zmumps_c.h>  // MUMPS header for double precision complex arithmetic (code tested with MUMPS 5.8.0).
@@ -252,9 +252,26 @@ void SparseComplexMatrix::print(const std::string& name) const {
 }
 
 /**
+ * Prints the sparsity pattern of the present sparse matrix to a PNG file.
+ */
+void SparseComplexMatrix::savePNG(const std::string& filename) const {
+    
+    Image img(nrow, ncol);
+    img.fill(COLOR_WHITE); // Set white background.
+    dcomplex elem;
+    
+    for (const Triplet& t : triplet) {// Loop on the nonzero elements.
+        img(t.i, t.j) = complexColor1(t.a);
+        //img(t.i, t.j) = complexColor2(t.a);
+    }
+    
+    img.savePNG(filename);
+}
+
+/**
  * Prints the sparsity pattern of the present sparse matrix to a portable pixmap file, a PPM file (see: https://en.wikipedia.org/wiki/Netpbm).
  */
-void SparseComplexMatrix::saveImage(const std::string& filename) const {
+void SparseComplexMatrix::savePPM(const std::string& filename) const {
     
     // Open a file in binary mode:
     std::ofstream ofs(filename, std::ios::binary);

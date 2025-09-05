@@ -206,12 +206,13 @@ void WaveSystem::infoHamiltonian() const {
  */
 void WaveSystem::plotHamiltonian() const {
     
-    const std::string filename = uniqueFile("hamiltonian", ".ppm");
+    const std::string filename = uniqueFile("hamiltonian", ".png");
+    const auto start = std::chrono::steady_clock::now();
     
-    const double fsize = 3*std::pow(static_cast<double>(npoint), 2); // Estimated file size in bytes (octets).
-    std::cout << TAG_INFO << "Plot Hamiltonian to file '" << filename << "', size " << fsize/1e6 << " Mo...\n";
+    hamiltonian.savePNG(filename);
     
-    hamiltonian.saveImage(filename);
+    double ctime = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
+    std::cout << TAG_INFO << "Hamiltonian saved to file '" << filename << "' in " << ctime << " s.\n";
 }
 
 /**
@@ -219,12 +220,13 @@ void WaveSystem::plotHamiltonian() const {
  */
 void WaveSystem::plotInputState() const {
     
-    const std::string filename = uniqueFile("input_state", ".ppm");
+    const std::string filename = uniqueFile("input_state", ".png");
+    const auto start = std::chrono::steady_clock::now();
     
-    const double fsize = 3*static_cast<double>(npoint)*ninputprop; // Estimated file size in bytes (octets).
-    std::cout << TAG_INFO << "Plot input state to file '" << filename << "', size " << (fsize/1e6) << " Mo...\n";
+    inputState.savePNG(filename);
     
-    inputState.saveImage(filename);
+    double ctime = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
+    std::cout << TAG_INFO << "Input state saved to file '" << filename << "' in " << ctime << " s.\n";
 }
 
 /**
@@ -232,12 +234,13 @@ void WaveSystem::plotInputState() const {
  */
 void WaveSystem::plotOutputState() const {
     
-    const std::string filename = uniqueFile("output_state", ".ppm");
+    const std::string filename = uniqueFile("output_state", ".png");
+    const auto start = std::chrono::steady_clock::now();
     
-    const double fsize = 3*static_cast<double>(npoint)*noutputprop; // Estimated file size in bytes (octets).
-    std::cout << TAG_INFO << "Plot output state to file '" << filename << "', size " << (fsize/1e6) << " Mo...\n";
+    outputState.savePNG(filename);
     
-    outputState.saveImage(filename);
+    double ctime = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
+    std::cout << TAG_INFO << "Input state saved to file '" << filename << "' in " << ctime << " s.\n";
 }
 
 /**
