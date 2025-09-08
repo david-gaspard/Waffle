@@ -102,6 +102,13 @@ Color complexColor2(const dcomplex z) {
 }
 
 /**
+ * Returns true if the two colors are equal, false otherwise.
+ */
+bool operator==(const Color& c1, const Color& c2) {
+    return c1.r == c2.r && c1.g == c2.g && c1.b == c2.b;
+}
+
+/**
  * Overload the stream operator to print the color in a portable pixmap file, a PPM file (see: https://en.wikipedia.org/wiki/Netpbm).
  */
 std::ofstream& operator<<(std::ofstream& ofs, const Color& c) {

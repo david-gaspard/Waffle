@@ -7,6 +7,7 @@
 #include "WaveSystem.hpp"
 #include "BaseTools.hpp"
 #include <random>
+#include <algorithm>
 #include <iomanip>
 
 /**
@@ -375,16 +376,25 @@ void WaveSystem::computeHamiltonian() {
     std::cout << TAG_INFO << "Building the Hamiltonian... ";
     const auto start_build = std::chrono::steady_clock::now(); // Gets the current time.
     
-    MeshPoint p;
     const dcomplex kh2 = dcomplex(kh*kh, MEPS);
+    const std::vector<Opening> opening = mesh.getOpening(); // Extract the list of openings.
+    Opening op;
+    MeshPoint p;
+    uint iop;
+    int np, i, j, ip, jp;
     
-    // 1. Preallocate the sparse Hamiltonian with an accurate estimate of the number of nonzero elements:
-    //const int nnzub = ... // TODO: Find a tight upper bound on "nnz" and check the speedup......
-    //hamiltonian.allocate(nnzub);
+    // 1. Preallocate the sparse Hamiltonian and precompute the opening matrices:
+    int nnzub = 5*npoint; // Computes an upper bound on the number of nonzero elements.
+    std::vector<ComplexMatrix> opmatrix; // Precompute the opneing matrices.
+    for (const Opening& op : opening) {// Loop over the openings.
+        np = op.index.size();
+        nnzub += (np - 1)*np;
+        opmatrix.push_back(openingMatrix(kh2, np));
+    }
+    hamiltonian.allocate(nnzub);
+    //std::cout << TAG_INFO << "Preallocated Hamiltonian with nnzub = " << nnzub << "\n";
     
-    // 2. Construct the bulk part of the Hamiltonian (Hermitian part) :
-    int np, i, j;
-    
+    // 2. Build the Hamiltonian row per row:
     for (i = 0; i < npoint; i++) {//Loop over the points of the mesh.
         
         p = mesh.getPoint(i);
@@ -400,35 +410,36 @@ void WaveSystem::computeHamiltonian() {
                 }
             }
         }
-    }
-    
-    // 3. Construct the part of the Hamiltonian in the openings (open boundary conditions) :
-    for (const Opening& op : mesh.getOpening()) {// Loop over the openings of the mesh.
-        
-        np = op.index.size();  // Number of points involved in the opening "op".
-        ComplexMatrix opmat = openingMatrix(kh2, np);  // Get the opening matrix, -1 + i*sqrt(kh^2 + D2), where D2 is the Laplacian matrix.
-        
-        for (i = 0; i < np; i++) {// Loop on the points in the opening.
-            
-            for (j = 0; j < np; j++) {// Add the opening matrix to the Hamiltonian.
-                hamiltonian(op.index.at(i), op.index.at(j)) = opmat(i, j);
+        else {// If the point is actually in an opening.
+            // Find to which opening the point p(i) belongs:
+            for (iop = 0; iop < opening.size(); iop++) {// Loop over the openings.
+                op = opening.at(iop);
+                auto ptr = lower_bound(op.index.begin(), op.index.end(), i);  // Find the point p(i) in the opening "op".
+                if (ptr != op.index.end() && *ptr == i) {// If the present opening contains the point p(i).
+                    ip = std::distance(op.index.begin(), ptr); // Get the index of p(i) inside the opening.
+                    np = op.index.size(); // Number of points in this opening.
+                    for (jp = 0; jp < np; jp++) {// Loop over the points in the present opening.
+                        hamiltonian(i, op.index.at(jp)) = opmatrix.at(iop)(ip, jp);
+                    }
+                }
             }
-            
-            p = mesh.getPoint(op.index.at(i)); // Get the current point p(i) in the opening.
-            
             for (const Direction dir : allDirections) {// Loop over the directions.
-                
                 j = p.neighbor(dir);
-                
                 if (j >= 0 && not mesh.getPoint(j).isOpening()) {// If point of index "j" belongs to the mesh, and is not an opening, then add H(i, j) = 1.
-                    hamiltonian(op.index.at(i), j) = 1.;
+                    hamiltonian(i, j) = 1.;
                 }
             }
         }
     }
     
-    // 4. Finalize the sparse Hamiltonian (sort the matrix elements in column-major ordering):
+    // 3. Finalize the sparse Hamiltonian (sort the matrix elements in column-major ordering):
     hamiltonian.finalize();
+    
+    // Print some warnings:
+    if (hamiltonian.getNnz() > nnzub) {
+        std::cout << TAG_WARN << "Insufficient matrix preallocation. Added nnz=" << hamiltonian.getNnz() 
+                  << " elements, but allocated only nnzub=" << nnzub << ".\n";
+    }
     
     // Measure the build time for information:
     double ctime_build = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_build).count();
@@ -593,6 +604,14 @@ void WaveSystem::computeIOStates() {
     inputState.finalize();
     outputState.finalize();
     
+    // Print some warnings:
+    if (jinput != ninputprop) {
+        std::cout << TAG_WARN << "Computed jinput=" << jinput << " input states, but planned ninputprop=" << ninputprop << ".\n";
+    }
+    if (joutput != noutputprop) {
+        std::cout << TAG_WARN << "Computed joutput=" << joutput << " output states, but planned noutputprop=" << noutputprop << ".\n";
+    }
+    
     // Normalize the density of states:
     dosinput  /= 2*PI*ninput;  // Note that it is the total number of input/output modes (including evanescent modes).
     dosoutput /= 2*PI*noutput;
@@ -604,7 +623,7 @@ void WaveSystem::computeIOStates() {
     if (dosinput > 3.*dosfree) {
         std::cout << TAG_WARN << "DOSinput=" << dosinput << " is large, meaning that an input lead resonates (inputKlh.real.min=" << inputKlh.real().min() << "). You may consider changing the number of input points...\n";
     }
-    else if (dosoutput > 3.*dosfree) {
+    if (dosoutput > 3.*dosfree) {
         std::cout << TAG_WARN << "DOSoutput=" << dosoutput << " is large, meaning that an output lead resonates (outputKlh.real.min=" << outputKlh.real().min() << "). You may consider changing the number of output points...\n";
     }
     

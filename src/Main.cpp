@@ -32,8 +32,8 @@
  * DONE: (14) Arthur 2025-09-04: Implement the average intensity Ibar(r) without wavefront shaping...
  * DONE: (15) Create script "plot_cut.py" to plot the intensity profile along a cut. A straight line should do the job...
  * DONE: (16) In SparseComplexMatrix: Improve plotImage() to export directly a PNG image instead of a heavy PPM file.
+ * DONE: (17) In SquareMesh: Create addImage(filename) to import PNG in order to facilitate the mesh creation...
  * 
- * TODO: (17) In SquareMesh: Create addImage(filename) to import PNG in order to facilitate the mesh creation...
  * 
  * (18) Arthur 2025-09-04: For the paper, come back with the double waveguide case (with/without absorber), and compute the eigenstate profile
  *      and the transmission eigenvalue distribution. Test changing the numerical aperture of each of the guides...
@@ -65,8 +65,8 @@ struct Context {
  */
 Context createWaveguide() {
     
-    const int length = 150;   // Number of points in the longitudinal direction, L/h. Better to reach length=width=1000 with kh=1.
-    const int width  = 150;   // Number of points in the transverse direction, W/h.
+    const int length = 300;   // Number of points in the longitudinal direction, L/h. Better to reach length=width=1000 with kh=1.
+    const int width  = 300;   // Number of points in the transverse direction, W/h.
     
     const double dscat = 8.5;  // Scattering depth, L/lscat. Default: dscat=8.5 (in order to get approximately dscat_eff=10).
     const double dabso = 0.;   // Absorption depth, L/labso.
@@ -342,6 +342,91 @@ Context createDoubleWaveguide2() {
     return {WaveSystem(name, mesh, kh, holscat, holabso), trange};
 }
 
+/**
+ * Create a mesh shaped as the Eiffel Tower.
+ */
+Context createEiffelTower402x877() {
+    
+    const std::string pngfile = "model/eiffel-tower_402x877.png";
+    //const std::string pngfile = "model/eiffel-tower_402x877_test1.png";
+    SquareMesh mesh(pngfile);
+    
+    const double dscat = 8.5;  // Scattering depth, L/lscat.
+    const double dabso = 0.;   // Absorption depth, L/labso.
+    
+    const std::string name = "EiffelTower_402x877/dscat_" + to_string_prec(dscat, 6);
+    
+    // Defines the physical parameters:
+    const double kh = 1.;  // Wavenumber times the lattice step. Recommended: kh = 1 -> lambda/h = 6.
+    const double holscat = dscat/877;
+    const double holabso = dabso/877;
+    
+    RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
+    trange(0, 0) = 0.980;  trange(0, 1) = 0.020;
+    trange(1, 0) = 0.580;  trange(1, 1) = 0.030;
+    trange(2, 0) = 0.330;  trange(2, 1) = 0.030;
+    trange(3, 0) = 0.100;  trange(3, 1) = 0.020;
+    
+    return {WaveSystem(name, mesh, kh, holscat, holabso), trange};
+}
+
+/**
+ * Create a mesh shaped as the Eiffel Tower.
+ */
+Context createSmallTest7x7() {
+    
+    const std::string pngfile = "model/small-test_7x7.png";
+    SquareMesh mesh(pngfile);
+    
+    const double dscat = 1.;  // Scattering depth, L/lscat.
+    const double dabso = 0.;   // Absorption depth, L/labso.
+    
+    const std::string name = "SmallTest_7x7/dscat_" + to_string_prec(dscat, 6);
+    
+    // Defines the physical parameters:
+    const double kh = 1.;  // Wavenumber times the lattice step. Recommended: kh = 1 -> lambda/h = 6.
+    const double holscat = dscat/5;
+    const double holabso = dabso/5;
+    
+    RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
+    trange(0, 0) = 0.980;  trange(0, 1) = 0.020;
+    trange(1, 0) = 0.580;  trange(1, 1) = 0.030;
+    trange(2, 0) = 0.330;  trange(2, 1) = 0.030;
+    trange(3, 0) = 0.100;  trange(3, 1) = 0.020;
+    
+    return {WaveSystem(name, mesh, kh, holscat, holabso), trange};
+}
+
+/**
+ * Create a waveguide with a corner in the output lead.
+ */
+Context createWaveguideCorner30x20() {
+    
+    const std::string pngfile = "model/waveguide-corner_30x20.png";
+    //const std::string pngfile = "model/waveguide_30x20.png";
+    //const std::string pngfile = "model/waveguide-partial_30x20.png";
+    //const std::string pngfile = "model/waveguide-step_30x20.png";
+    SquareMesh mesh(pngfile);
+    
+    const double dscat = 1.;  // Scattering depth, L/lscat.
+    const double dabso = 0.;   // Absorption depth, L/labso.
+    
+    const std::string name = "WaveguideCorner_30x20/dscat_" + to_string_prec(dscat, 6);
+    
+    // Defines the physical parameters:
+    const double kh = 1.;  // Wavenumber times the lattice step. Recommended: kh = 1 -> lambda/h = 6.
+    const double holscat = dscat/30;
+    const double holabso = dabso/30;
+    
+    RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
+    trange(0, 0) = 0.980;  trange(0, 1) = 0.020;
+    trange(1, 0) = 0.580;  trange(1, 1) = 0.030;
+    trange(2, 0) = 0.330;  trange(2, 1) = 0.030;
+    trange(3, 0) = 0.100;  trange(3, 1) = 0.020;
+    
+    return {WaveSystem(name, mesh, kh, holscat, holabso), trange};
+}
+
 /***************************************************************************************************
  * COMPUTATION OF TRANSMISSION EIGENSTATES
  ***************************************************************************************************/
@@ -536,26 +621,30 @@ int main(int argc, char** argv) {
     //Context ctx = createSlabRemission1();
     //Context ctx = createDoubleWaveguide1();
     //Context ctx = createDoubleWaveguide2();
+    //Context ctx = createEiffelTower402x877();
+    //Context ctx = createSmallTest7x7();
+    //Context ctx = createWaveguideCorner30x20();
     
     ctx.sys.printSummary();
     ctx.sys.infoHamiltonian();
     
     // Checking operations:
-    //ctx.sys.setDisorder(1);
-    //ctx.sys.checkResidual();
-    //ctx.sys.checkUnitarity(true);
     //ctx.sys.plotMesh();
+    //ctx.sys.plotHamiltonian();
     //ctx.sys.plotInputState();
     //ctx.sys.plotOutputState();
-    //ctx.sys.plotHamiltonian();
     //ctx.sys.plotGreenFunction();
     //ctx.sys.plotTransmissionStates();
     
-    //const int nseed = 100; // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
+    const int nseed = 1; // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
     
-    //taskTransmissionSerial(ctx.sys, ctx.trange, nseed);
+    taskTransmissionSerial(ctx.sys, ctx.trange, nseed);
     //taskTransmissionOMP(ctx.sys, ctx.trange, nseed);
     //taskAverageIntensitySerial(ctx.sys, nseed);
+    
+    // Posterior checking operations (reusing available solution):
+    //ctx.sys.checkResidual();
+    //ctx.sys.checkUnitarity(true);
     
     return 0;
 }

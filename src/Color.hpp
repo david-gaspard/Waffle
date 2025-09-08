@@ -36,6 +36,7 @@ Color HSVColor(double hue, double sat, double val);
 Color complexColor1(const dcomplex z);
 Color complexColor2(const dcomplex z);
 
+bool operator==(const Color& c1, const Color& c2);
 std::ofstream& operator<<(std::ofstream& ofs, const Color& c);
 
 #endif

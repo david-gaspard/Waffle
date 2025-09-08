@@ -7,6 +7,7 @@
 #ifndef _MESHPOINT_H
 #define _MESHPOINT_H
 #include <string>
+#include "Color.hpp"
 
 /**
  * Enumeration specifying the four possible directions on a square lattice (plus the omni-directional element):
@@ -49,6 +50,7 @@ struct MeshPoint {
 Direction opposite(const Direction dir);
 const std::string directionString(const Direction dir);
 const std::string boundaryTypeString(const int bndtype);
+int boundaryTypeFromColor(const Color& color);
 bool comparePoints(const MeshPoint& p1, const MeshPoint& p2);
 
 #endif

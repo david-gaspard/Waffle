@@ -117,13 +117,27 @@ int testMeshPolygon3() {
 }
 
 /**
+ * Test the creation of a mesh from a PNG image.
+ */
+int testMeshImage() {
+    
+    const std::string infile = "old/test/mesh_png/mesh_1.png";
+    SquareMesh mesh(infile);
+    
+    const std::string outfile = "old/test/mesh_png/mesh_1.csv";
+    mesh.plotMesh(outfile);
+    
+    return 0;
+}
+
+/**
  * Main function of the test of the SquareMesh object.
  */
 int main(int argc, char** argv) {
     
-    testMeshBasic();
+    //testMeshBasic();
     //testMeshPolygon1();
     //testMeshPolygon2();
     //testMeshPolygon3();
-    
+    testMeshImage();
 }

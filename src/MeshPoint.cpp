@@ -125,6 +125,22 @@ const std::string boundaryTypeString(const int bndtype) {
 }
 
 /**
+ * Returns the boundary type from the given color.
+ */
+int boundaryTypeFromColor(const Color& color) {
+    if (color == COLOR_GREEN) {
+        return BND_OPEN;
+    }
+    else if (color == COLOR_RED) {
+         return BND_INPUT;
+    }
+    else if (color == COLOR_BLUE) {
+        return BND_OUTPUT;
+    }
+    return BND_MIRROR; // Default return.
+}
+
+/**
  * Comparator function used to sort the points in column-major ordering, i.e., from up to down, then left to right.
  * This function returns "true" when "p1" is located before "p2" according to the column-major order.
  */

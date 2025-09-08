@@ -16,9 +16,9 @@
  */
 struct Opening {
     
-    std::vector<unsigned int> index;  // Indices of points involved in the present opening. The indices correspond to the vector "point" (see: SquareMesh).
-                                      // Note: As an alternative, this object could also store a copy of the mesh points, instead of the indices,
-                                      // but then the mesh points must store their own index.
+    std::vector<int> index;  // Indices of points involved in the present opening. The indices correspond to the vector "point" (see: SquareMesh).
+                              // Note: As an alternative, this object could also store a copy of the mesh points, instead of the indices,
+                              // but then the mesh points must store their own index.
     Direction direction;  // Boundary direction of the present opening.
     int bndtype;          // Type of boundary condition (either "input", "output", or "open").
     
@@ -42,14 +42,15 @@ class SquareMesh {
     
     // Constructors/Destructors:
     SquareMesh();
+    SquareMesh(const std::string& filename);
     ~SquareMesh();
     
     // Getters:
-    MeshPoint getPoint(const unsigned int i) const;
-    unsigned int getNPoint() const;
-    unsigned int getNBoundary(const int bndtype) const;
+    MeshPoint getPoint(const uint i) const;
+    uint getNPoint() const;
+    uint getNBoundary(const int bndtype) const;
     std::vector<Opening> getOpening() const;
-    unsigned int getNOpening() const;
+    uint getNOpening() const;
     
     // Determine the index of a given point:
     int indexOf(const int x, const int y) const;

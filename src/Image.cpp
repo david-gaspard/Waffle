@@ -33,20 +33,18 @@ Image::Image(const int height, const int width) {
  * Constructor of the Image object from a file.
  */
 Image::Image(const std::string& filename) {
-    //std::cout << TAG_INFO << "Creating Image from file '" << filename << "'...\n";
+    //std::cout << TAG_INFO << "Creating Image from file '" << filename << "'..." << std::endl;
     
-    if (not std::filesystem::exists(filename)) {// CHeck if the file exists.
-        throw std::invalid_argument("In Image(): File '" + filename + "' not found");
-    }
+    if (not std::filesystem::exists(filename)) throw std::invalid_argument("In Image(): File '" + filename + "' not found");
     
     FILE *fp = fopen(filename.c_str(), "rb");
     
     png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
-    if (!png) std::abort();
+    if (!png) throw std::runtime_error("In Image(): Aborted because !png");
     
     png_infop info = png_create_info_struct(png);
-    if (!info) std::abort();
-    if (setjmp(png_jmpbuf(png))) std::abort();
+    if (!info) throw std::runtime_error("In Image(): Aborted because !info");
+    if (setjmp(png_jmpbuf(png))) throw std::runtime_error("In Image(): Aborted because setjmp()");
     
     png_init_io(png, fp);
     png_read_info(png, info);
@@ -75,7 +73,7 @@ Image::Image(const std::string& filename) {
     }
     auto row_pointers = new png_bytep[height];
     for (int i = 0; i < height; i++) {// Loop over the rows.
-        row_pointers[i] = new png_byte[nchannels];
+        row_pointers[i] = new png_byte[nchannels*width];
     }
     
     png_read_image(png, row_pointers); // Read the PNG file. Data is now in "row_pointers".

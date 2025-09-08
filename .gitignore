@@ -9,7 +9,6 @@ plot/__pycache__/
 waffle
 *.test
 *.pdf
-*.png
 *.jpg
 *.tiff
 *.gif

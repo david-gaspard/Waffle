@@ -5,10 +5,11 @@
  * @file C++ code providing a two-dimensional square mesh object.
  ***/
 #include "SquareMesh.hpp"
+#include "Image.hpp"
 #include "BaseTools.hpp"
-#include <iostream>
 #include <cmath>
 #include <algorithm>
+#include <iostream>
 
 /**
  * Constructor of the Square Mesh object.
@@ -17,6 +18,43 @@ SquareMesh::SquareMesh() {
     std::cout << TAG_INFO << "Creating SquareMesh... ";
     ready = false;
     start_build = std::chrono::steady_clock::now(); // Measure time from SquareMesh creation (for information only).
+}
+
+/**
+ * Constructor of the SquareMesh object from a PNG file.
+ * The lower left corner of the image determines the position (0,0) of the mesh.
+ * Pixel colors are interpreted as follows:
+ * - White: Vacuum, no point is added to the mesh.
+ * - Black: Add a mesh point.
+ * - Green: Indicate an open boundary condition (neither input, nor output).
+ * - Red: Indicate an input boundary condition.
+ * - Blue: Indicate an output boundary condition.
+ * Mirror boundary conditions (Dirichlet, psi=0) are used by default.
+ */
+SquareMesh::SquareMesh(const std::string& filename) {
+    std::cout << TAG_INFO << "Creating SquareMesh from file '" << filename << "'... ";
+    ready = false;
+    start_build = std::chrono::steady_clock::now(); // Measure time from SquareMesh creation (for information only).
+    const Image img(filename); // Load the PNG image.
+    const int h = img.getHeight(), w = img.getWidth();
+    MeshPoint p;
+    
+    // Add the mesh points in column-major order:
+    for (int j = 0; j < w; j++) {// Loop over the columns of the image from left to right.
+        for (int i = 0; i < h; i++) {// Loop over the pixels of the j^th column from up to down.
+            if (img(i, j) == COLOR_BLACK) {// If the pixel is black, then add a mesh point.
+                p.x = j;
+                p.y = h - 1 - i;
+                if (i > 0)   p.north = boundaryTypeFromColor(img(i-1, j  ));
+                if (i < h-1) p.south = boundaryTypeFromColor(img(i+1, j  ));
+                if (j < w-1) p.east  = boundaryTypeFromColor(img(i  , j+1));
+                if (j > 0)   p.west  = boundaryTypeFromColor(img(i  , j-1));
+                point.push_back(p);  // Not necessary to use addPoint() here because it is a constructor (there was no point before in the mesh).
+            }
+        }
+    }
+    
+    finalize(); // Finalize the SquareMesh (fix neighbors + compute openings).
 }
 
 /**
@@ -93,7 +131,7 @@ unsigned int SquareMesh::getNOpening() const {
  */
 int SquareMesh::indexOf(const int x, const int y) const {
     auto ptr = std::lower_bound(point.begin(), point.end(), MeshPoint(x, y, BND_MIRROR), comparePoints);
-    if (ptr == point.end() || ptr->x != x || ptr->y != y) {// If the point does not exist, then inserts it.
+    if (ptr == point.end() || ptr->x != x || ptr->y != y) {// If the point does not exist, then returns -1.
         return -1;
     }
     return std::distance(point.begin(), ptr);
@@ -451,12 +489,12 @@ void SquareMesh::printOpening() const {
     
     MeshPoint p;
     
-    for (unsigned int iop = 0; iop < opening.size(); iop++) {// Loop over openings.
+    for (uint iop = 0; iop < opening.size(); iop++) {// Loop over openings.
         
         std::cout << TAG_INFO << "Opening #" << iop << ", bnd=" << boundaryTypeString(opening.at(iop).bndtype)
                   << ", dir=" << directionString(opening.at(iop).direction) << " : [\n";
         
-        for (unsigned int idx : opening.at(iop).index) {// Loop over the point indices composing the opening.
+        for (uint idx : opening.at(iop).index) {// Loop over the point indices composing the opening.
             p = point.at(idx); // Corresponding point in the mesh.
             std::cout << "\t" << idx << " (" << p.x << ", " << p.y << ")" 
                       << ", north=" << boundaryTypeString(p.north) << ", south=" << boundaryTypeString(p.south) 

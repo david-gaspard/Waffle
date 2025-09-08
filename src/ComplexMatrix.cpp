@@ -698,9 +698,7 @@ void ComplexMatrix::savePNG(const std::string& filename) const {
     
     for (int i = 0; i < nrow; i++) {// Loop over the rows.
         for (int j = 0; j < ncol; j++) {// Loop over the columns.
-            
             elem = data[i + j*nrow];  // Extract the matrix element (without changing the matrix state).
-            
             //img(i, j) = complexColor1(elem);
             img(i, j) = complexColor2(elem);
         }

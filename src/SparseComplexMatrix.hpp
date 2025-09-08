@@ -74,6 +74,7 @@ class SparseComplexMatrix {
     
     void checkIndices(const int i, const int j) const;
     void computeSymmetry();
+    void sumDuplicate();
     
 };
 

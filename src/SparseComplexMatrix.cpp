@@ -36,6 +36,14 @@ bool operator<(const Triplet& t1, const Triplet& t2) {
 }
 
 /**
+ * Overloads the equality operator between two triplets. This overload is necessary to remove the duplicate matrix elements (see: finalize()).
+ * Returns "true" if triplet "t1" is located at the same position as "t1", "false" otherwise.
+ */
+bool operator==(const Triplet& t1, const Triplet& t2) {
+    return t1.i == t2.i && t1.j == t2.j;
+}
+
+/**
  * Overload the streaming operator to print triplet automatically.
  */
 std::ostream& operator<<(std::ostream& os, const Triplet& t) {
@@ -172,6 +180,14 @@ dcomplex SparseComplexMatrix::get(const int i, const int j) const {
 
 /**
  * Returns "true" is the matrix is symmetric, "false" otherwise.
+ */
+bool SparseComplexMatrix::isSymmetric() const {
+    checkSorted("isSymmetric()");
+    return symmetric;
+}
+
+/**
+ * Returns "true" is the matrix is symmetric, "false" otherwise.
  * Argument "tol" is the tolerance over the relative difference.
  * Typically, it should be of the order of the machine epsilon (1e-16) or larger.
  * This method implicitly assumes that the matrix elements are already sorted and does not perform checking (this is why it should remain private).
@@ -187,6 +203,8 @@ void SparseComplexMatrix::computeSymmetry() {
     
     //auto start_sym = std::chrono::steady_clock::now();
     
+    symmetric = true; // The matrix is symmetric by default, until proven otherwise.
+    
     for (const Triplet& t : triplet) {// Loop over the triplets.
         
         if (t.i > t.j) {// Only perform the check in the lower triangle.
@@ -194,6 +212,8 @@ void SparseComplexMatrix::computeSymmetry() {
             aji = get(t.j, t.i);  // Get the symmetric element.
             
             if (std::abs(t.a - aji) + std::abs(t.a - aji) > tol*(std::abs(t.a.real()) + std::abs(t.a.imag()) + 1.)) {// Symmetry criterion with tolerance.
+                std::cout << TAG_WARN << "Element A(" << t.i << ", " << t.j << ") = " << t.a << " is different from A("
+                          << t.j << ", " << t.i << ") = " << aji << "...\n";
                 symmetric = false;
                 return;
             }
@@ -202,16 +222,23 @@ void SparseComplexMatrix::computeSymmetry() {
     
     //double ctime_sym = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_sym).count();
     //std::cout << TAG_INFO << "computeSymmetry(): Time = " << ctime_sym << " s.\n";
-    
-    symmetric = true;
 }
 
 /**
- * Returns "true" is the matrix is symmetric, "false" otherwise.
+ * Sum the duplicate triplets (i.e., matrix elements at the same position (i,j)) of the sparse matrix after it is sorted.
+ * Print a warning if duplicate entries are found.
+ * This method implicitly assumes that the triplets are sorted in column-major ordering.
  */
-bool SparseComplexMatrix::isSymmetric() const {
-    checkSorted("isSymmetric()");
-    return symmetric;
+void SparseComplexMatrix::sumDuplicate() {
+    
+    for (auto tp = triplet.end()-1; tp > triplet.begin(); tp--) {// Loop the vector backward (thus safely removing elements).
+        if (*tp == *(tp-1)) {// If consecutive triplets have the same position (i,j) in the matrix.
+            std::cout << TAG_WARN << "Summing triplets " << *tp << " and " << *(tp-1) << "...\n";
+            (tp-1)->a += tp->a;
+            triplet.erase(tp); // Remove the copied triplet.
+            //std::cout << TAG_WARN << "Summed triplet is " << *(tp-1) << "...\n";
+        }
+    }
 }
 
 /**
@@ -220,7 +247,7 @@ bool SparseComplexMatrix::isSymmetric() const {
 void SparseComplexMatrix::finalize() {
     if (not sorted) {// Only sort one time.
         std::sort(triplet.begin(), triplet.end());  // Sort is O(N*log(N)) in time.
-            // Note that "sort()" implicitly uses the comparison operator<(t1,t2) defined before.
+        sumDuplicate(); // Sum the duplicate elements. About O(N) in time.
         sorted = true; // Declare the vector "triplet" as sorted before computing the symmetry.
         computeSymmetry(); // Determines if the matrix is symmetric, in principle O(N*log(N)) in time.
     }
@@ -235,7 +262,7 @@ void SparseComplexMatrix::finalize() {
  */
 void SparseComplexMatrix::printSummary(const std::string& name) const {
     std::cout << TAG_INFO << "Sparse complex matrix '" << name << "': Nrow=" << nrow << ", Ncol=" << ncol << ", Nnz=" << triplet.size() 
-              << ", Density=" << 100.*density() << "%, Sorted=" << (sorted ? "true" : "false") 
+              << ", Capacity=" << triplet.capacity() << ", Density=" << 100.*density() << "%, Sorted=" << (sorted ? "true" : "false") 
               << ", Symmetric=" << (isSymmetric() ? "true" : "false") << ".\n";
 }
 
@@ -261,8 +288,8 @@ void SparseComplexMatrix::savePNG(const std::string& filename) const {
     dcomplex elem;
     
     for (const Triplet& t : triplet) {// Loop on the nonzero elements.
-        img(t.i, t.j) = complexColor1(t.a);
-        //img(t.i, t.j) = complexColor2(t.a);
+        //img(t.i, t.j) = complexColor1(t.a);
+        img(t.i, t.j) = complexColor2(t.a);
     }
     
     img.savePNG(filename);
@@ -546,7 +573,8 @@ void solveMumps(const SparseComplexMatrix& a, const SparseComplexMatrix& b, Comp
     //====== Enter the sparse matrix A ======
     #define ICNTL(I) icntl[(I)-1] // Macro such that indices match documentation (see MUMPS manual).
     id.ICNTL(5) = 0;  // Declare the use of assembled format (standard triplet format).
-    const int a_nnz  = a.symmetric ? (a.triplet.size() + a.nrow)/2 : a.triplet.size();
+    const uint64_t a_nnz  = a.symmetric ? (a.triplet.size() + a.nrow)/2 : a.triplet.size();
+    //std::cout << TAG_INFO << "In solveMumps(): Attempting to allocate a_nnz=" << a_nnz << std::endl;
     auto a_elem = new mumps_double_complex[a_nnz];
     auto a_irow = new int[a_nnz];
     auto a_jcol = new int[a_nnz];
@@ -570,7 +598,8 @@ void solveMumps(const SparseComplexMatrix& a, const SparseComplexMatrix& b, Comp
     id.a   = a_elem;
     
     //====== Enter the sparse right-hand side B ======
-    const int b_nnz  = b.triplet.size();
+    const uint64_t b_nnz  = b.triplet.size();
+    //std::cout << TAG_INFO << "In solveMumps(): Attempting to allocate b_nnz=" << b_nnz << std::endl;
     auto b_elem = new mumps_double_complex[b_nnz];
     auto b_irow = new int[b_nnz];
     auto b_pcol = new int[b.ncol+1];
@@ -598,7 +627,10 @@ void solveMumps(const SparseComplexMatrix& a, const SparseComplexMatrix& b, Comp
     id.irhs_ptr    = b_pcol;
     
     //====== Solve the linear system A.X = B ======
-    id.rhs = new mumps_double_complex[x.getNrow() * x.getNcol()]; // Allocate space for the solution.
+    //std::cout << TAG_INFO << "In solveMumps(): Attempting to allocate x.getNrow() * x.getNcol() = " << uint64_t(x.getNrow() * x.getNcol()) << std::endl;
+    id.rhs = new mumps_double_complex[uint64_t(x.getNrow() * x.getNcol())]; // Allocate space for the solution.
+    //std::cout << TAG_INFO << "In solveMumps(): Allocation successful, now solving..." << std::endl;
+    
     id.ICNTL(1)  = 0;  // Disable printing.
     id.ICNTL(2)  = 0;  // Disable printing.
     id.ICNTL(3)  = 0;  // Disable printing.

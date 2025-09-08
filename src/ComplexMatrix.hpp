@@ -16,8 +16,8 @@ class ComplexMatrix {
     private:
     
     dcomplex* data;  // Array containing the matrix elements in column-major order (LAPACK's convention).
-    int nrow;        // Number of rows of the matrix.
-    int ncol;        // Number of columns of the matrix.
+    int nrow;       // Number of rows of the matrix.
+    int ncol;       // Number of columns of the matrix.
     
     public:
     
