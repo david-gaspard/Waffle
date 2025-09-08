@@ -614,7 +614,7 @@ int main(int argc, char** argv) {
     std::cout << "****** This is " << PROGRAM_COPYRIGHT << " ******\n";
     
     // Create the simulation context:
-    Context ctx = createWaveguide();
+    //Context ctx = createWaveguide();
     //Context ctx = createSlabTransmission1();
     //Context ctx = createSlabTransmission2();
     //Context ctx = createSlabTransmission3();
@@ -625,10 +625,38 @@ int main(int argc, char** argv) {
     //Context ctx = createSmallTest7x7();
     //Context ctx = createWaveguideCorner30x20();
     
+    // Create the system from a PNG image:
+    //SquareMesh mesh("model/double-guide-abso-sym_642x384.png");
+    //SquareMesh mesh("model/double-guide-abso-shift-20_642x384.png");
+    SquareMesh mesh("model/maze_706x513.png");
+    
+    // TODO: Redo the simu maze_706x513 for nseed > 200 after parallelizing with OpenMP.
+    
+    const double dscat = 8.5;  // Scattering depth, L/lscat. Default: dscat=8.5 (in order to get approximately dscat_eff=10).
+    const double dabso = 0.;   // Absorption depth, L/labso.
+    
+    const std::string sysname = "maze_706x513/dscat_" + to_string_prec(dscat, 6);
+    
+    const double kh = 1.;  // Wavenumber times the lattice step. Recommended: kh = 1 -> lambda/h = 6.
+    const double holscat = dscat/706;
+    const double holabso = dabso/706;
+    
+    WaveSystem sys(sysname, mesh, kh, holscat, holabso);
+    
+    RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
+    trange(0, 0) = 0.980;  trange(0, 1) = 0.020;
+    trange(0, 0) = 0.850;  trange(0, 1) = 0.030;
+    trange(1, 0) = 0.580;  trange(1, 1) = 0.030;
+    trange(2, 0) = 0.330;  trange(2, 1) = 0.030;
+    //trange(3, 0) = 0.100;  trange(3, 1) = 0.020;
+    
+    Context ctx = {sys, trange};
+    
     ctx.sys.printSummary();
     ctx.sys.infoHamiltonian();
     
     // Checking operations:
+    //ctx.sys.setDisorder(1);
     //ctx.sys.plotMesh();
     //ctx.sys.plotHamiltonian();
     //ctx.sys.plotInputState();
@@ -636,7 +664,7 @@ int main(int argc, char** argv) {
     //ctx.sys.plotGreenFunction();
     //ctx.sys.plotTransmissionStates();
     
-    const int nseed = 1; // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
+    const int nseed = 20; // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
     
     taskTransmissionSerial(ctx.sys, ctx.trange, nseed);
     //taskTransmissionOMP(ctx.sys, ctx.trange, nseed);
