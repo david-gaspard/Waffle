@@ -20,7 +20,7 @@ def plot_proj(args):
     
     column_name = args[1]  ## Interpret arg #1 as the name of the column in the field file.
     field_file = args[2]   ## Interpret arg #2 as the name of the field file.
-    file_path = os.path.splitext(field_file)[0]  ## The file path is the filename without its extension (used to write new files). 
+    file_path = os.path.splitext(field_file)[0] + "_" + column_name  ## The file path will be used to write new files.
     
     try:
         fp = open(field_file, 'r')
@@ -96,7 +96,7 @@ def plot_proj(args):
     )
     
     ## Export the TikZ code to a file and compile it:
-    tikz_file = file_path + '_proj.tikz'
+    tikz_file = file_path + "_proj.tikz"
     print(ct.TAG_INFO + "Writing TikZ file: '" + tikz_file + "'...")
     open(tikz_file, 'w').write(tikz_code)
     ct.compile_tikz(tikz_file) ## Compile the TikZ file.

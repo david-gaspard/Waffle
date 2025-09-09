@@ -286,7 +286,7 @@ void WaveSystem::plotIntensity(const RealMatrix& intensity, const std::string& d
         << "x" << sep << "y" << sep << "north" << sep << "south" << sep << "east" << sep << "west";
     
     for (int istate = 0; istate < nstate; istate++) {// Loop over the input modes to finish the column names.
-        ofs << sep << "I_" << istate;
+        ofs << sep << "I" << istate;
     }
     ofs << "\n";
     
@@ -307,7 +307,7 @@ void WaveSystem::plotIntensity(const RealMatrix& intensity, const std::string& d
     }
     ofs.close();  // Close the stream before calling an external script (this may cause I/O trouble).
     
-    std::string cmd("plot/plot_map.py lin I_0 " + filename);
+    std::string cmd("plot/plot_map.py lin I0 " + filename);
     std::cout << TAG_EXEC << cmd << "\n";
     if (std::system(cmd.c_str())) {
         std::cout << TAG_WARN << "The plot script returned an error.\n";
@@ -640,9 +640,9 @@ void WaveSystem::computeIOStates() {
 void WaveSystem::computeGreenFunction() {
     if (not computed) {// This function only does the computation if the flag "computed" is "false".
         //std::cout << TAG_INFO << "Solving the sparse system now..." << std::endl;
-        //solveUmfpack(hamiltonian, inputState, green);
+        solveUmfpack(hamiltonian, inputState, green);
             // Solve the system using UMFPACK (no parallelization, no iterative refinement).
-        solveMumps(hamiltonian, inputState, green);
+        //solveMumps(hamiltonian, inputState, green);
             // Solve the system using MUMPS sequentially (MPI disabled, no iterative refinement).
             // Note that MUMPS is faster than UMFPACK but uses more memory.
         computed = true;  // Declare the Green function as computed.

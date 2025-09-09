@@ -44,6 +44,7 @@ class RealMatrix {
     RealMatrix transpose() const;
     friend RealMatrix operator+(const RealMatrix& a, const RealMatrix& b);
     friend RealMatrix operator-(const RealMatrix& a, const RealMatrix& b);
+    friend RealMatrix& operator+=(RealMatrix& a, const RealMatrix& b);
     friend RealMatrix operator*(const double scalar, const RealMatrix& a);
     friend RealMatrix operator*(const RealMatrix& a, const double scalar);
     friend RealMatrix operator*(const RealMatrix& a, const RealMatrix& b);

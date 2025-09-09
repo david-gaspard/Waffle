@@ -197,6 +197,25 @@ RealMatrix operator-(const RealMatrix& a, const RealMatrix& b) {
 }
 
 /**
+ * Overload the increment operator.
+ */
+RealMatrix& operator+=(RealMatrix& a, const RealMatrix& b) {
+    
+    if (a.nrow != b.nrow || a.ncol != b.ncol) {// Check for possible incompatibilities.
+        std::string msg = "In operator+=(): Incompatible matrix sizes A(" 
+                        + std::to_string(a.nrow) + ", " + std::to_string(a.ncol) + ") and B(" 
+                        + std::to_string(b.nrow) + ", " + std::to_string(b.ncol) + ").";
+        throw std::invalid_argument(msg);
+    }
+    
+    for (int l = 0; l < a.nrow*a.ncol; l++) {
+        a.data[l] += b.data[l];
+    }
+    
+    return a;
+}
+
+/**
  * Multiplication of a matrix by a scalar.
  */
 RealMatrix operator*(const double scalar, const RealMatrix& a) {

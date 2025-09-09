@@ -110,7 +110,7 @@ def plot_cut(args):
     a = np.asarray((args[2], args[3]), dtype=float) ## Interpret the following arguments as point "a".
     b = np.asarray((args[4], args[5]), dtype=float) ## Interpret the following arguments as point "b".
     field_file = args[6]   ## Interpret arg #6 as the name of the field file.
-    file_path = os.path.splitext(field_file)[0]  ## The file path is the filename without its extension (used to write new files). 
+    file_path = os.path.splitext(field_file)[0] + "_" + column_name  ## The file path will be used to write new files.
     
     try:
         fp = open(field_file, 'r')
@@ -175,7 +175,7 @@ def plot_cut(args):
     )
     
     ## Export the TikZ code to a file and compile it:
-    tikz_file = file_path + '_cut.tikz'
+    tikz_file = file_path + "_cut.tikz"
     print(ct.TAG_INFO + "Writing TikZ file: '" + tikz_file + "'...")
     open(tikz_file, 'w').write(tikz_code)
     ct.compile_tikz(tikz_file) ## Compile the TikZ file.
