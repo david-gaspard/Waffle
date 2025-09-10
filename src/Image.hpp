@@ -23,7 +23,7 @@ class Image {
     
     // Constructors/Destructors:
     Image(const int height, const int width);
-    Image(const std::string& filename);
+    Image(const std::string& pngfile);
     ~Image();
     
     // Getters/Setters:
@@ -32,8 +32,8 @@ class Image {
     Color& operator()(const int i, const int j) const;
     
     // Export:
-    void savePPM(const std::string& filename) const;
-    void savePNG(const std::string& filename) const;
+    void savePPM(const std::string& ppmfile) const;
+    void savePNG(const std::string& pngfile) const;
     
     // Image transformations:
     void fill(const Color color);

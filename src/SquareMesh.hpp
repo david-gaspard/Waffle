@@ -42,7 +42,7 @@ class SquareMesh {
     
     // Constructors/Destructors:
     SquareMesh();
-    SquareMesh(const std::string& filename);
+    SquareMesh(const std::string& pngfile);
     ~SquareMesh();
     
     // Getters:

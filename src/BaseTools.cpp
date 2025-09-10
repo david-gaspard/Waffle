@@ -69,10 +69,10 @@ const std::string timeToString(double time) {
  */
 void printProgressBar(const int64_t cjob, const int64_t njob, const std::string& msg, const std::chrono::steady_clock::time_point& start) {
     
-    const double elapsed_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
+    const double elapsed_sec = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
     
     // 1. Compute the estimated remaining time, expected time of arrival (ETA):
-    const double eta = (elapsed_time * (njob - cjob))/cjob;  // ETA in number of seconds.
+    const double eta = (elapsed_sec * (njob - cjob))/cjob;  // ETA in number of seconds.
     const std::string eta_str = timeToString(eta);
     
     // 2. Compute the progress bar:
@@ -91,11 +91,11 @@ void printProgressBar(const int64_t cjob, const int64_t njob, const std::string&
  */
 double endProgressBar(const std::chrono::steady_clock::time_point& start) {
     
-    const double elapsed_time = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
+    const double elapsed_sec = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
     
-    std::cout << "\n" << TAG_EXEC << "Done in " << elapsed_time << " s.\n";
+    std::cout << "\n" << TAG_EXEC << "Done in " << elapsed_sec << " s.\n";
     
-    return elapsed_time;
+    return elapsed_sec;
 }
 
 /**

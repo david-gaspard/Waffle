@@ -32,12 +32,12 @@ Image::Image(const int height, const int width) {
 /**
  * Constructor of the Image object from a file.
  */
-Image::Image(const std::string& filename) {
-    //std::cout << TAG_INFO << "Creating Image from file '" << filename << "'..." << std::endl;
+Image::Image(const std::string& pngfile) {
+    //std::cout << TAG_INFO << "Creating Image from file '" << pngfile << "'..." << std::endl;
     
-    if (not std::filesystem::exists(filename)) throw std::invalid_argument("In Image(): File '" + filename + "' not found");
+    if (not std::filesystem::exists(pngfile)) throw std::invalid_argument("In Image(): File '" + pngfile + "' not found");
     
-    FILE *fp = fopen(filename.c_str(), "rb");
+    FILE *fp = fopen(pngfile.c_str(), "rb");
     
     png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
     if (!png) throw std::runtime_error("In Image(): Aborted because !png");
@@ -140,10 +140,10 @@ Color& Image::operator()(const int i, const int j) const {
 /**
  * Save the present image in Netpbm portable pixmap format (PPM).
  */
-void Image::savePPM(const std::string& filename) const {
+void Image::savePPM(const std::string& ppmfile) const {
     
     // Open a file in binary mode:
-    std::ofstream ofs(filename, std::ios::binary);
+    std::ofstream ofs(ppmfile, std::ios::binary);
     ofs << "P6 " << (uint32_t)width << ' ' << (uint32_t)height << ' ' << (uint32_t)MAX_COLOR << ' ';
     
     for (int l = 0; l < width*height; l++) {// Loop over all pixels.
@@ -155,9 +155,9 @@ void Image::savePPM(const std::string& filename) const {
 /**
  * Save the present image in Portable Network Graphics (PNG) format.
  */
-void Image::savePNG(const std::string& filename) const {
+void Image::savePNG(const std::string& pngfile) const {
     
-    FILE* fp = fopen(filename.c_str(), "wb"); // Open the file.
+    FILE* fp = fopen(pngfile.c_str(), "wb"); // Open the file.
     if (!fp) std::abort();
     
     // Initialize the PNG instance:

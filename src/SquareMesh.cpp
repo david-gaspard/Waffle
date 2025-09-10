@@ -31,11 +31,11 @@ SquareMesh::SquareMesh() {
  * - Blue: Indicate an output boundary condition.
  * Mirror boundary conditions (Dirichlet, psi=0) are used by default.
  */
-SquareMesh::SquareMesh(const std::string& filename) {
-    std::cout << TAG_INFO << "Creating SquareMesh from file '" << filename << "'... ";
+SquareMesh::SquareMesh(const std::string& pngfile) {
+    std::cout << TAG_INFO << "Creating SquareMesh from file '" << pngfile << "'... ";
     ready = false;
     start_build = std::chrono::steady_clock::now(); // Measure time from SquareMesh creation (for information only).
-    const Image img(filename); // Load the PNG image.
+    const Image img(pngfile); // Load the PNG image.
     const int h = img.getHeight(), w = img.getWidth();
     MeshPoint p;
     
@@ -77,7 +77,7 @@ void SquareMesh::checkReady(const std::string& name) const {
 /**
  * Return the point at position "i" in the mesh.
  */
-MeshPoint SquareMesh::getPoint(const unsigned int i) const {
+MeshPoint SquareMesh::getPoint(const uint i) const {
     checkReady("getPoint()");
     return point.at(i);  // vector objects already make bound checking.
 }
@@ -85,7 +85,7 @@ MeshPoint SquareMesh::getPoint(const unsigned int i) const {
 /**
  * Returns the number of points in the mesh.
  */
-unsigned int SquareMesh::getNPoint() const {
+uint SquareMesh::getNPoint() const {
     checkReady("getNPoint()");
     return point.size();
 }
@@ -95,13 +95,13 @@ unsigned int SquareMesh::getNPoint() const {
  * This method can be used for instance to determine the number of input/output channels in order to compute
  * the intensity profile of transmission eigenchannels (see: saveIntensities()).
  */
-unsigned int SquareMesh::getNBoundary(const int bndtype) const {
+uint SquareMesh::getNBoundary(const int bndtype) const {
     
     checkReady("getNBoundary()");
     
-    unsigned int nbnd = 0;
+    uint nbnd = 0;
     
-    for (MeshPoint p : point) {// Loop on the points, looking for boundary conditions.
+    for (const MeshPoint& p : point) {// Loop on the points, looking for boundary conditions.
         nbnd += (p.north == bndtype) + (p.south == bndtype) + (p.east == bndtype) + (p.west == bndtype);
     }
     
@@ -151,7 +151,7 @@ void SquareMesh::addPoint(const int x, const int y, const int bndtype) {
     MeshPoint p(x, y, bndtype);
     auto ptr = std::lower_bound(point.begin(), point.end(), p, comparePoints);
     if (ptr == point.end() || ptr->x != x || ptr->y != y) {// If the point does not exist, then inserts it.
-        point.insert(ptr, p);  // This is unfortunately O(N).
+        point.insert(ptr, p);  // This is unfortunately O(N) but can be mitigated if we insert already in the correct order.
         ready = false;
     }
 }
@@ -164,8 +164,8 @@ void SquareMesh::addRectangle(int xmin, int xmax, int ymin, int ymax, const int 
     if (xmin > xmax) std::swap(xmin, xmax);
     if (ymin > ymax) std::swap(ymin, ymax);
     
-    for (int x = xmin; x <= xmax; x++) {
-        for (int y = ymax; y >= ymin; y--) {// Loop on the square lattice in reading order.
+    for (int x = xmin; x <= xmax; x++) {// Loop on the square lattice in reading order.
+        for (int y = ymax; y >= ymin; y--) {
             addPoint(x, y, bndtype);
         }
     }
@@ -181,8 +181,8 @@ void SquareMesh::addDisk(int x0, int y0, double radius, const int bndtype) {
     int ymax = (int) std::ceil (y0 + radius);
     int r2 = (int) std::ceil(radius*radius);
     int dx, dy;
-    for (int x = xmin; x <= xmax; x++) {
-        for (int y = ymax; y >= ymin; y--) {// Loop on the square lattice in reading order.
+    for (int x = xmin; x <= xmax; x++) {// Loop on the square lattice in reading order.
+        for (int y = ymax; y >= ymin; y--) {
             dx = x - x0;
             dy = y - y0;
             if (dx*dx + dy*dy <= r2) {
@@ -203,8 +203,8 @@ void SquareMesh::addPolygon(const std::vector<Vector2D>& polygon, const int bndt
     
     // 2. Loop on points in the rectangular region:
     Vector2D p;
-    for (int x = xmin; x <= xmax; x++) {
-        for (int y = ymax; y >= ymin; y--) {// Loop on the square lattice in reading order.
+    for (int x = xmin; x <= xmax; x++) {// Loop on the square lattice in reading order.
+        for (int y = ymax; y >= ymin; y--) {
             p = Vector2D(x, y);   // Current point that we attempt to add to the mesh.
             if (p.windingNumber(polygon) % 2 != 0) {// Uses the even-odd rule to fill the polygon (fill if the winding number is odd).
                 addPoint(x, y, bndtype);
@@ -267,8 +267,8 @@ void SquareMesh::removeRectangle(int xmin, int xmax, int ymin, int ymax) {
     if (xmin > xmax) std::swap(xmin, xmax);
     if (ymin > ymax) std::swap(ymin, ymax);
     
-    for (int x = xmin; x <= xmax; x++) {
-        for (int y = ymax; y >= ymin; y--) {// Loop on the square lattice in reading order.
+    for (int x = xmin; x <= xmax; x++) {// Loop on the square lattice in reading order.
+        for (int y = ymax; y >= ymin; y--) {
             removePoint(x, y);
         }
     }
@@ -284,8 +284,8 @@ void SquareMesh::removeDisk(const int x0, const int y0, const double radius) {
     int ymax = (int) std::ceil (y0 + radius);
     int r2 = (int) std::ceil(radius*radius);
     int dx, dy;
-    for (int x = xmin; x <= xmax; x++) {
-        for (int y = ymax; y >= ymin; y--) {// Loop on the square lattice in reading order.
+    for (int x = xmin; x <= xmax; x++) {// Loop on the square lattice in reading order.
+        for (int y = ymax; y >= ymin; y--) {
             dx = x - x0;
             dy = y - y0;
             if (dx*dx + dy*dy <= r2) {
@@ -305,8 +305,8 @@ void SquareMesh::removeHalfDisk(const int x0, const int y0, const double radius)
     int ymax = (int) std::ceil (y0 + radius);
     int r2 = (int) std::ceil(radius*radius);
     int dx, dy;
-    for (int x = xmin; x <= xmax; x++) {
-        for (int y = ymax; y >= ymin; y--) {// Loop on the square lattice in reading order.
+    for (int x = xmin; x <= xmax; x++) {// Loop on the square lattice in reading order.
+        for (int y = ymax; y >= ymin; y--) {
             dx = x - x0;
             dy = y - y0;
             if (dx*dx + dy*dy <= r2) {
@@ -327,8 +327,8 @@ void SquareMesh::removePolygon(const std::vector<Vector2D>& polygon) {
     
     // 2. Loop on points in the rectangular region:
     Vector2D p;
-    for (int x = xmin; x <= xmax; x++) {
-        for (int y = ymax; y >= ymin; y--) {// Loop on the square lattice in reading order.
+    for (int x = xmin; x <= xmax; x++) {// Loop on the square lattice in reading order.
+        for (int y = ymax; y >= ymin; y--) {
             p = Vector2D(x, y);   // Current point that we attempt to add to the mesh.
             if (p.windingNumber(polygon) % 2 != 0) {// Uses the even-odd rule to remove the polygon.
                 removePoint(x, y);
@@ -360,8 +360,8 @@ void SquareMesh::setBoundaryRectangle(int xmin, int xmax, int ymin, int ymax, co
     if (xmin > xmax) std::swap(xmin, xmax);
     if (ymin > ymax) std::swap(ymin, ymax);
     
-    for (int x = xmin; x <= xmax; x++) {
-        for (int y = ymax; y >= ymin; y--) {// Loop on the square lattice in reading order.
+    for (int x = xmin; x <= xmax; x++) {// Loop on the square lattice in reading order.
+        for (int y = ymax; y >= ymin; y--) {
             setBoundaryPoint(x, y, dir, bndtype);
         }
     }
@@ -377,8 +377,8 @@ void SquareMesh::setBoundaryDisk(const int x0, const int y0, const double radius
     int ymax = (int)  std::ceil(y0 + radius);
     int r2 = (int) std::ceil(radius*radius);
     int dx, dy;
-    for (int x = xmin; x <= xmax; x++) {
-        for (int y = ymax; y >= ymin; y--) {// Loop on the square lattice in reading order.
+    for (int x = xmin; x <= xmax; x++) {// Loop on the square lattice in reading order.
+        for (int y = ymax; y >= ymin; y--) {
             dx = x - x0;
             dy = y - y0;
             if (dx*dx + dy*dy <= r2) {
@@ -521,7 +521,7 @@ void SquareMesh::saveMesh(const std::string& filename, const char* sep) const {
     ofs << "%% SquareMesh with Npoint=" << point.size() << ".\n"
         << "x" << sep << "y" << sep << "north" << sep << "south" << sep << "east" << sep << "west\n";
     
-    for (MeshPoint p : point) {
+    for (const MeshPoint& p : point) {
         ofs << p.x << sep << p.y << sep << boundaryTypeString(p.north) << sep 
                                         << boundaryTypeString(p.south) << sep 
                                         << boundaryTypeString(p.east) << sep 
@@ -547,7 +547,7 @@ void SquareMesh::saveMeshShort(const std::string& filename, const char* sep) con
     ofs << "%% SquareMesh with Npoint=" << point.size() << ".\n" 
         << "x" << sep << "y" << sep << "bnd\n";
     
-    for (MeshPoint p : point) {
+    for (const MeshPoint& p : point) {
         ofs << p.x << sep << p.y << sep;
         if (p.north == BND_INPUT || p.south == BND_INPUT || p.east == BND_INPUT || p.west == BND_INPUT) {
             ofs << "input";
