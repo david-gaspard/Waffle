@@ -33,17 +33,23 @@
  * DONE: (15) Create script "plot_cut.py" to plot the intensity profile along a cut. A straight line should do the job...
  * DONE: (16) In SparseComplexMatrix: Improve plotImage() to export directly a PNG image instead of a heavy PPM file.
  * DONE: (17) In SquareMesh: Create addImage(filename) to import PNG in order to facilitate the mesh creation...
+ * DONE: (18) Arthur 2025-09-04: For the paper, come back with the double waveguide case (with/without absorber), and compute the eigenstate profile
+ *       and the transmission eigenvalue distribution. Test changing the numerical aperture of each of the guides...
  * 
+ * TODO: Perform benchmark simulations (+ comparison with Usadel) for :
+ *      (A) Square waveguide 500x500, 
+ *      (B) Slab transmission 300x900, 
+ *      (C) Slab remission 300x900, 
+ *      (D) Find a double waveguide case with symmetry breaking enhancement... Definition of such system is unclear + Nothing to do with Radiant Field Theory...
  * 
- * (18) Arthur 2025-09-04: For the paper, come back with the double waveguide case (with/without absorber), and compute the eigenstate profile
- *      and the transmission eigenvalue distribution. Test changing the numerical aperture of each of the guides...
  * (19) Arthur 2025-09-04: What happens if we add a non-scattering region in the center of the waveguide ?
  *      We would have D(r) -> infty... What happens in the Usadel equation ?
  *      It would be funny to find a system with transmission eigenstate "opposite" to the average intensity (without shaping). 
  *      Such that maximum of the eigenstate corresponds to the minimum of the average intensity...
  * (20) Do no forget to implement the absorption (holabso != 0) using complex wavenumbers.
  *      Check that the implementation is correct, maybe using the Green function, or the distribution rho(T) (which should match RecurGreen's results)...
- * (21) In Main: Possibly add parallelized taskTransmissionOMP(). Maybe MPI is more relevant, given the memory size of reference 1 Mpx simulations...
+ * 
+ * DONE: (21) In Main: Possibly add parallelized taskTransmissionOMP(). Maybe MPI is more relevant, given the memory size of reference 1 Mpx simulations...
  * (22) Arthur 2025-09-04: For the paper, come back on the geometrical interpretation of the Q space and the (theta,eta) parametrization...
  */
 
@@ -689,24 +695,33 @@ int main(int argc, char** argv) {
     //SquareMesh mesh("model/double-guide-abso-shift-15_642x384.png");
     //SquareMesh mesh("model/maze_706x513.png");
     //SquareMesh mesh("model/slab-transmission-1_299x893.png");
-    SquareMesh mesh("model/ring-guide_700x700.png");
+    //SquareMesh mesh("model/ring-guide_700x700.png");
+    //SquareMesh mesh("model/arched-guide_1002x750.png");
+    //SquareMesh mesh("model/arched-guide-absorber_1002x750.png");
+    //SquareMesh mesh("model/slab-guide_302x900.png");
+    SquareMesh mesh("model/slab-transmission-1_302x902.png");
     
-    const double dscat = 8.5;  // Scattering depth, L/lscat. Default: dscat=8.5 (in order to get approximately dscat_eff=10).
+    const double dscat = 8.6;  // Scattering depth, L/lscat. Default: dscat=8.6 (in order to get approximately dscat_eff=10).
     const double dabso = 0.;   // Absorption depth, L/labso.
     
-    const std::string sysname = "ring-guide_700x700/dscat_" + to_string_prec(dscat, 6);
+    const std::string sysname = "slab-transmission-1_302x902/dscat_" + to_string_prec(dscat, 6);
     
     const double kh = 1.;  // Wavenumber times the lattice step. Recommended: kh = 1 -> lambda/h = 6.
-    const double holscat = dscat/700;
-    const double holabso = dabso/700;
+    const double holscat = dscat/300;
+    const double holabso = dabso/300;
     
     WaveSystem sys(sysname, mesh, kh, holscat, holabso);
     
-    RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    trange(0, 0) = 0.975;  trange(0, 1) = 0.025;
-    trange(1, 0) = 0.900;  trange(1, 1) = 0.025;
-    trange(2, 0) = 0.800;  trange(2, 1) = 0.025;
-    trange(3, 0) = 0.100;  trange(3, 1) = 0.025;
+    RealMatrix trange(8, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
+    //trange(0, 0) = 0.975;  trange(0, 1) = 0.025;
+    trange(0, 0) = 0.70;  trange(0, 1) = 0.010;
+    trange(1, 0) = 0.68;  trange(1, 1) = 0.010;
+    trange(2, 0) = 0.66;  trange(2, 1) = 0.010;
+    trange(3, 0) = 0.64;  trange(3, 1) = 0.010;
+    trange(4, 0) = 0.62;  trange(4, 1) = 0.010;
+    trange(5, 0) = 0.60;  trange(5, 1) = 0.010;
+    trange(6, 0) = 0.58;  trange(6, 1) = 0.010;
+    trange(7, 0) = 0.10;  trange(7, 1) = 0.005;
     
     Context ctx = {sys, trange};
     
@@ -722,11 +737,11 @@ int main(int argc, char** argv) {
     //ctx.sys.plotGreenFunction();
     //ctx.sys.plotTransmissionStates();
     
-    const int nseed = 1;  // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
+    const int nseed = 500;  // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
     const int nthread = 8; // Number of threads used in multithreading with OpenMP.
     
-    taskTransmissionSerial(ctx.sys, ctx.trange, nseed);
-    //taskTransmissionOMP(ctx.sys, ctx.trange, nseed, nthread);
+    //taskTransmissionSerial(ctx.sys, ctx.trange, nseed);
+    taskTransmissionOMP(ctx.sys, ctx.trange, nseed, nthread);
     //taskAverageIntensitySerial(ctx.sys, nseed);
     
     // Posterior checking operations (reusing available solution):
