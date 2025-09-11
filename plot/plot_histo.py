@@ -17,7 +17,7 @@ def plot_histo(args):
         return 1
     
     sample_file = args[1]
-    file_path = os.path.splitext(sample_file)[0]  ## The file path is the filename without its extension (used to write new files). 
+    file_path = os.path.splitext(sample_file)[0] + "_histo"  ## The file path is the filename without its extension (used to write new files). 
     
     ## Import the data:
     #start = time.time()
@@ -46,14 +46,21 @@ def plot_histo(args):
     ## Compute the histogram:
     histo = np.histogram(samples, bins=binlist, density=True)  ## The sample array is implicitly flattened.
     tavg = np.mean(samples)  ## Compute the average transmission probability (to adjust the bimodal law).
+    histo = np.column_stack((funbin(np.arange(nbin)+0.5), histo[0]))
     
-    ## Write the histogram data string:
-    linelen = 3  ## Number of points on each line (arbitrary but not too large).
-    histo_string = ""
-    for i in range(histo[0].size):
-        histo_string += "(" + str(funbin(i+0.5)) + ", " + str(histo[0][i]) + ") "
-        if (i%linelen == linelen-1):
-            histo_string += "\n\t"
+    ## Write the histogram data in a CSV file:
+    csv_file = file_path + ".csv"
+    csv_header = """%% Generated on {timestamp} by {my_program} {my_copyright}
+{data_header}
+%% Command: {command}
+tval, rho""".format(
+        timestamp = datetime.datetime.now().astimezone().strftime("%F at %T %z"),
+        my_program = args[0],
+        my_copyright = ct.MY_COPYRIGHT,
+        data_header = data_header,
+        command = " ".join(args)
+    )
+    np.savetxt(csv_file, histo, fmt='%.16g', delimiter=", ", header=csv_header, comments="")
     
     ## Write the TikZ code:
     tikz_code = """%% Generated on {timestamp} by {my_program} {my_copyright}
@@ -65,16 +72,14 @@ def plot_histo(args):
     xlabel={{{xlabel}}},
     ylabel={{{ylabel}}},
     xmin={xmin}, xmax={xmax},
-    ymin=0.02, ymax=200,
+    ymin=0.002, ymax=50,
     ymode=log,
     unbounded coords=jump,  %% Discard NaN's and negative entries.
     clip marker paths=true, %% Clips the marks out of the axis frame.
     clip mode=individual,   %% Ensure the marks do not overlay the other curves.
 ]%
 \\addplot[black!30, smooth, domain=0.001:0.999, samples=64] ({{sin(90*\\x)^2}}, {{\\tavg/(2 * sin(90*\\x)^2 * cos(90*\\x))}}); %% Plot the bimodal distribution.
-\\addplot[mark=*, only marks, mark size=0.8] coordinates {{%% 
-\t{histo_string}
-}};
+\\addplot[mark=*, mark size=0.8] table[x=tval, y=rho]{{{csv_file}}};
 \\end{{axis}}%
 \\end{{tikzpicture}}%""".format(
         timestamp = datetime.datetime.now().astimezone().strftime("%F at %T %z"),
@@ -87,11 +92,11 @@ def plot_histo(args):
         xmin   = 0,
         xmax   = 1,
         tavg = tavg,
-        histo_string = histo_string
+        csv_file = "\\jobname.csv"
     )
     
     ## Export the TikZ code to a file and compile it:
-    tikz_file = file_path + '.tikz'
+    tikz_file = file_path + ".tikz"
     print(ct.TAG_INFO + "Writing TikZ file: '" + tikz_file + "'...")
     open(tikz_file, 'w').write(tikz_code)
     ct.compile_tikz(tikz_file) ## Compile the TikZ file.

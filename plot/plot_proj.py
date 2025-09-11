@@ -13,14 +13,15 @@ def plot_proj(args):
     are assumed to be integers, and the cardinal directions are the indices of nearest neighbors or boundary conditions.
     """
     ## Check if the number of arguments is correct:
-    if (len(args) != 3):
+    if (len(args) != 4):
         print(ct.TAG_ERROR + "Invalid number of arguments, doing nothing...")
-        print(ct.TAG_USAGE + args[0] + " COLUMN_NAME FIELD_FILE")
+        print(ct.TAG_USAGE + args[0] + " COLUMN_NAME UNIT_LENGTH FIELD_FILE")
         return 1
     
     column_name = args[1]  ## Interpret arg #1 as the name of the column in the field file.
-    field_file = args[2]   ## Interpret arg #2 as the name of the field file.
-    file_path = os.path.splitext(field_file)[0] + "_" + column_name  ## The file path will be used to write new files.
+    unit_length = float(eval(args[2]))  ## Interpret arg #6 as the value of h/lscat, or more generally the unit length.
+    field_file = args[3]   ## Interpret arg #2 as the name of the field file.
+    file_path = os.path.splitext(field_file)[0] + "_" + column_name + "_proj"  ## The file path will be used to write new files.
     
     try:
         fp = open(field_file, 'r')
@@ -30,7 +31,6 @@ def plot_proj(args):
     
     data = list(csv.DictReader((line for line in fp if not line.startswith('%')), skipinitialspace=True))
     data_header = ct.get_header(fp, '%')
-    holscat = float(ct.get_value_in_string("h/lscat", data_header))  ## Extract the ratio h/lscat.
     
     ## Extract the bounds of the system from the array of points:
     point = np.asarray([(int(p['x']), int(p['y'])) for p in data], dtype=int)
@@ -51,17 +51,24 @@ def plot_proj(args):
     ## Compute the average projection along the 'x' direction:
     proj = np.zeros((nx, 2))
     for ix in range(nx):
-        proj[ix, 0] = xmin + (xmax-xmin)*(float(ix)/(nx-1))
+        proj[ix, 0] = (xmin + (xmax-xmin)*(float(ix)/(nx-1))) * unit_length
     
     proj[:, 1] = np.nanmean(matrix, axis=0)  ## Compute the mean ignoring NaN values.
     
-    ## Write the projection data in a string:
-    linelen = 3  ## Number of points on each line (arbitrary but not too large).
-    proj_string = ""
-    for i in range(nx):
-        proj_string += "(" + str(proj[i, 0]) + ", " + str(proj[i, 1]) + ") "
-        if (i%linelen == linelen-1):
-            proj_string += "\n\t"
+    ## Write the projected data in a CSV file:
+    csv_file = file_path + ".csv"
+    csv_header = """%% Generated on {timestamp} by {my_program} {my_copyright}
+{data_header}
+%% Command: {command}
+x, {column_name}""".format(
+        timestamp = datetime.datetime.now().astimezone().strftime("%F at %T %z"),
+        my_program = args[0],
+        my_copyright = ct.MY_COPYRIGHT,
+        data_header = data_header,
+        command = " ".join(args),
+        column_name = column_name
+    )
+    np.savetxt(csv_file, proj, fmt='%.16g', delimiter=", ", header=csv_header, comments="")
     
     ## Write the TikZ code and compile the result:
     tikz_code = """%% Generated on {timestamp} by {my_program} {my_copyright}
@@ -72,14 +79,12 @@ def plot_proj(args):
     xlabel={{{xlabel}}},
     ylabel={{{ylabel}}},
     xmin={xmin}, xmax={xmax},
-    xticklabel={{\\pgfmathparse{{{holscat}*\\tick}}$\\pgfmathprintnumber[fixed relative, precision=3]{{\\pgfmathresult}}$}}, %% Rescale ticks to get x/lscat = (x/h) * (h/lscat), with h/lscat={holscat}.
+    %%ymode=log,
     unbounded coords=jump,  %% Discard NaN's and negative entries.
     clip marker paths=true, %% Clips the marks out of the axis frame.
     clip mode=individual,   %% Ensure the marks do not overlay the other curves.
 ]%
-\\addplot[black, thick, line join=bevel] coordinates {{%% 
-\t{proj_string}
-}};
+\\addplot[black, thick, line join=bevel] table[x=x, y={column_name}]{{{csv_file}}};
 \\end{{axis}}%
 \\end{{tikzpicture}}%""".format(
         timestamp = datetime.datetime.now().astimezone().strftime("%F at %T %z"),
@@ -89,14 +94,14 @@ def plot_proj(args):
         title = "\\textbf{Cmd:} \\detokenize{"+ " ".join(args) + "}",
         xlabel = "$x/\\ell$",
         ylabel = "\\detokenize{" + column_name + "}",
-        holscat = holscat,
-        xmin   = xmin,
-        xmax   = xmax,
-        proj_string = proj_string
+        xmin   = proj[:, 0].min(),
+        xmax   = proj[:, 0].max(),
+        column_name = column_name,
+        csv_file = "\\jobname.csv"
     )
     
     ## Export the TikZ code to a file and compile it:
-    tikz_file = file_path + "_proj.tikz"
+    tikz_file = file_path + ".tikz"
     print(ct.TAG_INFO + "Writing TikZ file: '" + tikz_file + "'...")
     open(tikz_file, 'w').write(tikz_code)
     ct.compile_tikz(tikz_file) ## Compile the TikZ file.

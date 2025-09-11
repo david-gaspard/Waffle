@@ -345,7 +345,7 @@ void WaveSystem::plotTransmissionStates() {
     const int nstate = std::min(noutputprop, ninputprop);
     ComplexMatrix tstate(npoint, nstate);
     RealMatrix tval(nstate, 1);
-    transmissionStates(tstate, tval);
+    computeTransmissionStates(tstate, tval);
     
     // 2. Then compute the square modulus of the transmission eigenstates:
     RealMatrix intensity(npoint, nstate);
@@ -754,14 +754,15 @@ void WaveSystem::checkUnitarity(const bool showtval) {
 }
 
 /**
- * Compute the intensity corresponding to an incoherent mixture of all input modes, and add it to the given data matrix.
+ * Compute the intensity corresponding to a isotropic mixture of all input modes, and add it to the given data matrix.
+ * The intensity is normalized to get unit incident intensity.
  */
-void WaveSystem::addAverageIntensity(RealMatrix& ibar) {
+void WaveSystem::addIIsotropic(RealMatrix& iavg) {
     
     // 1. First check for possible errors:
-    if (ibar.getNrow() != npoint || ibar.getNcol() != 1) {
-        std::string msg = "In addAverageIntensity(): Invalid size of 'ibar'. Received ("
-                        + std::to_string(ibar.getNrow()) + ", " + std::to_string(ibar.getNcol()) + "), expected ("
+    if (iavg.getNrow() != npoint || iavg.getNcol() != 1) {
+        std::string msg = "In addIIsotropic(): Invalid size of 'iavg'. Received ("
+                        + std::to_string(iavg.getNrow()) + ", " + std::to_string(iavg.getNcol()) + "), expected ("
                         + std::to_string(npoint) + ", 1).";
         throw std::invalid_argument(msg);
     }
@@ -780,7 +781,7 @@ void WaveSystem::addAverageIntensity(RealMatrix& ibar) {
             intensity += psi.real()*psi.real() + psi.imag()*psi.imag();
         }
         intensity /= ninputprop;
-        ibar(ipoint, 0) += intensity;
+        iavg(ipoint, 0) += intensity;
     }
 }
 
@@ -792,18 +793,18 @@ void WaveSystem::addAverageIntensity(RealMatrix& ibar) {
  * tstate  = On output, selected transmission eigenstates. Size: (npoint, min(ninputprop, noutputprop)).
  * tval    = On output, list of transmission eigenvalues. Size: (min(ninputprop, noutputprop), 1).
  */
-void WaveSystem::transmissionStates(ComplexMatrix& tstate, RealMatrix& tval) {
+void WaveSystem::computeTransmissionStates(ComplexMatrix& tstate, RealMatrix& tval) {
     
     // 1. First check for possible errors:
     const int ntval = std::min(ninputprop, noutputprop);
     if (tstate.getNrow() != npoint || tstate.getNcol() != ntval) {
-        std::string msg = "In transmissionStates(): Invalid size of 'tstate'. Received ("
+        std::string msg = "In computeTransmissionStates(): Invalid size of 'tstate'. Received ("
                         + std::to_string(tstate.getNrow()) + ", " + std::to_string(tstate.getNcol()) + "), expected ("
                         + std::to_string(npoint) + ", " + std::to_string(ntval) + ").";
         throw std::invalid_argument(msg);
     }
     else if (tval.getNrow() != ntval || tval.getNcol() != 1) {
-        std::string msg = "In transmissionStates(): Invalid size of 'tval'. Received ("
+        std::string msg = "In computeTransmissionStates(): Invalid size of 'tval'. Received ("
                         + std::to_string(tval.getNrow()) + ", " + std::to_string(tval.getNcol()) + "), expected ("
                         + std::to_string(ntval) + ", 1).";
         throw std::invalid_argument(msg);
@@ -856,28 +857,28 @@ void WaveSystem::transmissionStates(ComplexMatrix& tstate, RealMatrix& tval) {
  *            This method increments the number of found transmission eigenstates, so "nsample" must be initialized to zero.
  * tval     = On output, list of all transmission eigenvalues (ignoring considerations on eigenstates). Size: (min(ninputprop, noutputprop), 1).
  */
-void WaveSystem::addTransmissionProfiles(const RealMatrix& trange, RealMatrix& tprofile, RealMatrix& nsample, RealMatrix& tval) {
+void WaveSystem::addITransmission(const RealMatrix& trange, RealMatrix& tprofile, RealMatrix& nsample, RealMatrix& tval) {
     
     // 1. First check for possible errors:
     const int nprofile = trange.getNrow();
     const int ntval = std::min(ninputprop, noutputprop);
     if (trange.getNcol() != 2) {
-        throw std::invalid_argument("In addTransmissionProfiles(): Invalid size of 'trange', expected 2 columns for Tmin and Tmax.");
+        throw std::invalid_argument("In addITransmission(): Invalid size of 'trange', expected 2 columns for Tmin and Tmax.");
     }
     else if (tprofile.getNrow() != npoint || tprofile.getNcol() != nprofile) {
-        std::string msg = "In addTransmissionProfiles(): Invalid size of 'tprofile'. Received ("
+        std::string msg = "In addITransmission(): Invalid size of 'tprofile'. Received ("
                         + std::to_string(tprofile.getNrow()) + ", " + std::to_string(tprofile.getNcol()) + "), expected ("
                         + std::to_string(npoint) + ", " + std::to_string(nprofile) + ").";
         throw std::invalid_argument(msg);
     }
     else if (nsample.getNrow() != nprofile || nsample.getNcol() != 1) {
-        std::string msg = "In addTransmissionProfiles(): Invalid size of 'nsample'. Received ("
+        std::string msg = "In addITransmission(): Invalid size of 'nsample'. Received ("
                         + std::to_string(nsample.getNrow()) + ", " + std::to_string(nsample.getNcol()) + "), expected ("
                         + std::to_string(nprofile) + ", 1).";
         throw std::invalid_argument(msg);
     }
     else if (tval.getNrow() != ntval || tval.getNcol() != 1) {
-        std::string msg = "In addTransmissionProfiles(): Invalid size of 'tval'. Received ("
+        std::string msg = "In addITransmission(): Invalid size of 'tval'. Received ("
                         + std::to_string(tval.getNrow()) + ", " + std::to_string(tval.getNcol()) + "), expected ("
                         + std::to_string(ntval) + ", 1).";
         throw std::invalid_argument(msg);

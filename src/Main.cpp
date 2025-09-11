@@ -35,22 +35,29 @@
  * DONE: (17) In SquareMesh: Create addImage(filename) to import PNG in order to facilitate the mesh creation...
  * DONE: (18) Arthur 2025-09-04: For the paper, come back with the double waveguide case (with/without absorber), and compute the eigenstate profile
  *       and the transmission eigenvalue distribution. Test changing the numerical aperture of each of the guides...
+ * DONE: (19) In Main: Possibly add parallelized taskTransmissionOMP(). Maybe MPI is more relevant, given the memory size of reference 1 Mpx simulations...
+ * 
+ * TODO: Modify plot_histo.py, plot_cut.py, plot_proj.py to output CSV files instead of writing data directly into TikZ files.
+ *       This will allow the simulations parameters in headers to be preserved as locally as possible.
  * 
  * TODO: Perform benchmark simulations (+ comparison with Usadel) for :
  *      (A) Square waveguide 500x500, 
- *      (B) Slab transmission 300x900, 
- *      (C) Slab remission 300x900, 
- *      (D) Find a double waveguide case with symmetry breaking enhancement... Definition of such system is unclear + Nothing to do with Radiant Field Theory...
+ *      (B) Slab transmission 300x900, equal size input and output,
+ *      (C) Slab transmission 300x900, large input, small output,
+ *      (D) Slab remission 300x900, 
+ *      (E) Another geometry, maybe the double waveguide, the maze, the "random fiber", or simply the random cavity (to be discussed)...
  * 
- * (19) Arthur 2025-09-04: What happens if we add a non-scattering region in the center of the waveguide ?
+ * (21) Arthur 2025-09-11: Implement average intensity for a plane wave input in order to show the comparison in the paper.
+ *      In the code, make clear the distinction between Lambertian input and plane wave input.
+ * 
+ * (22) Arthur 2025-09-04: What happens if we add a non-scattering region in the center of the waveguide ?
  *      We would have D(r) -> infty... What happens in the Usadel equation ?
  *      It would be funny to find a system with transmission eigenstate "opposite" to the average intensity (without shaping). 
  *      Such that maximum of the eigenstate corresponds to the minimum of the average intensity...
- * (20) Do no forget to implement the absorption (holabso != 0) using complex wavenumbers.
+ * (23) Do no forget to implement the absorption (holabso != 0) using complex wavenumbers.
  *      Check that the implementation is correct, maybe using the Green function, or the distribution rho(T) (which should match RecurGreen's results)...
  * 
- * DONE: (21) In Main: Possibly add parallelized taskTransmissionOMP(). Maybe MPI is more relevant, given the memory size of reference 1 Mpx simulations...
- * (22) Arthur 2025-09-04: For the paper, come back on the geometrical interpretation of the Q space and the (theta,eta) parametrization...
+ * (24) Arthur 2025-09-04: For the paper, come back on the geometrical interpretation of the Q space and the (theta,eta) parametrization...
  */
 
 /**
@@ -440,13 +447,13 @@ Context createWaveguideCorner30x20() {
 /**
  * Normalize the disorder averages of transmission eigenstates profile contained in "tprofile" knowing the corresponding number of samples "nsample".
  */
-void normalizeTProfile(RealMatrix& tprofile, const RealMatrix& nsample) {
+void normalizeITransmission(RealMatrix& tprofile, const RealMatrix& nsample) {
     
     // 1. Check for possible errors:
     const int npoint = tprofile.getNrow();
     const int nprofile = tprofile.getNcol();
     if (nsample.getNrow() != nprofile || nsample.getNcol() != 1) {
-        std::string msg = "In normalizeTProfile(): Invalid dimensions of nsample, received (" 
+        std::string msg = "In normalizeITransmission(): Invalid dimensions of nsample, received (" 
                         + std::to_string(nsample.getNrow()) + ", " + std::to_string(nsample.getNcol()) + "), expected (" 
                         + std::to_string(nprofile) + ", 1).";
         throw std::invalid_argument(msg);
@@ -463,10 +470,10 @@ void normalizeTProfile(RealMatrix& tprofile, const RealMatrix& nsample) {
 }
 
 /**
- * Save the transmission profile to a CSV file and call external scripts to plot it.
+ * Save the intensity profile of transmission eigenstate to a CSV file and call external scripts to plot it.
  */
-void plotTProfile(const RealMatrix& tprofile, const RealMatrix& trange, const RealMatrix& nsample,
-                  const RealMatrix& tvalstore, const WaveSystem& sys, const double ctime, const int nthread) {
+void plotITransmission(const RealMatrix& tprofile, const RealMatrix& trange, const RealMatrix& nsample,
+                       const RealMatrix& tvalstore, const WaveSystem& sys, const double ctime, const int nthread) {
     
     // 1. First compute some metadata:
     const int nseed = tvalstore.getNrow();
@@ -480,9 +487,9 @@ void plotTProfile(const RealMatrix& tprofile, const RealMatrix& trange, const Re
     for (int iprofile = 0; iprofile < nprofile; iprofile++) {// Save the ranges of transmission eigenvalues for which 
         info += " " + std::to_string(trange(iprofile, 0)) + "+-" + std::to_string(trange(iprofile, 1)) + " ";
     }
-    info += "], found Nsample=[";
+    info += "]\n%% Found Nsample=[";
     for (int iprofile = 0; iprofile < nprofile; iprofile++) {// Save the ranges of transmission eigenvalues for which 
-        info += " " + std::to_string(nsample(iprofile, 0)) + " ";
+        info += " " + std::to_string(static_cast<int>(nsample(iprofile, 0))) + " ";
     }
     info += "], Nseed=" + std::to_string(nseed) + ", Tavg=" + std::to_string(tavg) + ", L/lscat_eff=" + std::to_string(dscat_eff) + ", Computation_time=" + std::to_string(ctime) + " s, Nthread=" + std::to_string(nthread) + ".";
     
@@ -544,20 +551,20 @@ void plotHistogram(const RealMatrix& tvalstore, const WaveSystem& sys, const dou
  * and the intensity profile of selected transmission eigenchannels (aka eigenstates).
  * Save the results to files with automated names, and call external plot scripts.
  */
-void taskTransmissionSerial(WaveSystem& sys, RealMatrix& trange, const int nseed) {
+void taskITransmissionSerial(WaveSystem& sys, RealMatrix& trange, const int nseed) {
     
     const int npoint = sys.getNPoint();
     const int nprofile = trange.getNrow();  // Get the desired number of profiles.
     const int ntval = std::min(sys.getNInputProp(), sys.getNOutputProp());  // Get the number of nonzero transmission eigenvalues (propagating modes).
     RealMatrix tprofile(npoint, nprofile), nsample(nprofile, 1), tval(ntval, 1), tvalstore(nseed, ntval);
     
-    const std::string msg = "Tprofile, serial";
+    const std::string msg = "ITransmission, serial";
     const auto start = std::chrono::steady_clock::now(); // Gets the current time.
     
     for (int iseed = 0; iseed < nseed; iseed++) {// Loop over realizations of the disorder.
         
         sys.setDisorder(iseed+1); // Avoid seed=0 for safety.
-        sys.addTransmissionProfiles(trange, tprofile, nsample, tval);
+        sys.addITransmission(trange, tprofile, nsample, tval);
         
         for (int ival = 0; ival < ntval; ival++) {// Save the nonzero transmission eigenvalues in the matrix tvalstore.
             tvalstore(iseed, ival) = tval(ival, 0); // Copy the transmission eigenvalues.
@@ -572,8 +579,8 @@ void taskTransmissionSerial(WaveSystem& sys, RealMatrix& trange, const int nseed
     const double ctime = endProgressBar(start);
     
     // Save data to files and plot:
-    normalizeTProfile(tprofile, nsample);  // Normalize the averages of transmission eigenstate profiles.
-    plotTProfile(tprofile, trange, nsample, tvalstore, sys, ctime, 1);
+    normalizeITransmission(tprofile, nsample);  // Normalize the averages of transmission eigenstate profiles.
+    plotITransmission(tprofile, trange, nsample, tvalstore, sys, ctime, 1);
     plotHistogram(tvalstore, sys, ctime, 1);
 }
 
@@ -583,7 +590,7 @@ void taskTransmissionSerial(WaveSystem& sys, RealMatrix& trange, const int nseed
  * Save the results to files with automated names, and call external plot scripts.
  * This version uses multithreading with OpenMP to perform the averaging over the disorder.
  */
-void taskTransmissionOMP(WaveSystem& sys, RealMatrix& trange, const int nseed, const int nthread) {
+void taskITransmissionOMP(WaveSystem& sys, RealMatrix& trange, const int nseed, const int nthread) {
     
     const int npoint = sys.getNPoint();
     const int nprofile = trange.getNrow();  // Get the desired number of profiles.
@@ -591,7 +598,7 @@ void taskTransmissionOMP(WaveSystem& sys, RealMatrix& trange, const int nseed, c
     RealMatrix tprofile(npoint, nprofile), nsample(nprofile, 1), tval(ntval, 1), tvalstore(nseed, ntval);
     
     int cjob = 0; // Current number of completed jobs (i.e., realizations of the disorder).
-    const std::string msg = "Tprofile, " + std::to_string(nthread) + " thr";
+    const std::string msg = "ITransmission, " + std::to_string(nthread) + " thr";
     const auto start = std::chrono::steady_clock::now(); // Gets the current time.
     
     #pragma omp parallel num_threads(nthread)
@@ -603,7 +610,7 @@ void taskTransmissionOMP(WaveSystem& sys, RealMatrix& trange, const int nseed, c
         for (int iseed = 0; iseed < nseed; iseed++) {// Loop over realizations of the disorder.
             
             sys_loc.setDisorder(iseed+1); // Avoid seed=0 for safety.
-            sys_loc.addTransmissionProfiles(trange, tprofile_loc, nsample_loc, tval_loc);
+            sys_loc.addITransmission(trange, tprofile_loc, nsample_loc, tval_loc);
             
             for (int ival = 0; ival < ntval; ival++) {// Save the nonzero transmission eigenvalues in the matrix tvalstore.
                 tvalstore(iseed, ival) = tval_loc(ival, 0); // Copy the transmission eigenvalues.
@@ -629,8 +636,8 @@ void taskTransmissionOMP(WaveSystem& sys, RealMatrix& trange, const int nseed, c
     const double ctime = endProgressBar(start);
     
     // Save data to files and plot:
-    normalizeTProfile(tprofile, nsample);  // Normalize the averages of transmission eigenstate profiles.
-    plotTProfile(tprofile, trange, nsample, tvalstore, sys, ctime, nthread);
+    normalizeITransmission(tprofile, nsample);  // Normalize the averages of transmission eigenstate profiles.
+    plotITransmission(tprofile, trange, nsample, tvalstore, sys, ctime, nthread);
     plotHistogram(tvalstore, sys, ctime, nthread);
 }
 
@@ -639,35 +646,35 @@ void taskTransmissionOMP(WaveSystem& sys, RealMatrix& trange, const int nseed, c
  ***************************************************************************************************/
 
 /**
- * Compute the mode-average intensity averaged over "nseed" realizations of the disorder.
+ * Compute the intensity corresponding to an isotropic (Lambertian) input state averaged over "nseed" realizations of the disorder.
  * Save the results to files with automated names, and call external plot scripts.
  */
-void taskAverageIntensitySerial(WaveSystem& sys, const int nseed) {
+void taskIIsotropicSerial(WaveSystem& sys, const int nseed) {
     
     const int npoint = sys.getNPoint();
-    RealMatrix ibar(npoint, 1);
+    RealMatrix iavg(npoint, 1);
     
-    const std::string msg = "Ibar, serial";
+    const std::string msg = "Iisotropic, serial";
     const auto start = std::chrono::steady_clock::now(); // Gets the current time.
     
     for (int iseed = 0; iseed < nseed; iseed++) {// Loop over realizations of the disorder.
         
         sys.setDisorder(iseed+1); // Avoid seed=0 for safety.
-        sys.addAverageIntensity(ibar);
+        sys.addIIsotropic(iavg);
         printProgressBar(iseed+1, nseed, msg, start);
     }
     
     // Normalize the disorder average:
     for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points.
-        ibar(ipoint, 0) /= nseed;
+        iavg(ipoint, 0) /= nseed;
     }
     
     // End progress bar and compute the total time (in seconds):
     const double ctime = endProgressBar(start);
     
     // Save the data and plot:
-    const std::string info = "Mode-averaged intensity Ibar for Nseed=" + std::to_string(nseed) + ", Computation_time=" + std::to_string(ctime) + " s.";
-    sys.plotIntensity(ibar, info, "ibar");
+    const std::string info = "Intensity for isotropic input with Nseed=" + std::to_string(nseed) + ", Computation_time=" + std::to_string(ctime) + " s.";
+    sys.plotIntensity(iavg, info, "iavg");
 }
 
 /***************************************************************************************************
@@ -712,16 +719,13 @@ int main(int argc, char** argv) {
     
     WaveSystem sys(sysname, mesh, kh, holscat, holabso);
     
-    RealMatrix trange(8, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    //trange(0, 0) = 0.975;  trange(0, 1) = 0.025;
-    trange(0, 0) = 0.70;  trange(0, 1) = 0.010;
-    trange(1, 0) = 0.68;  trange(1, 1) = 0.010;
-    trange(2, 0) = 0.66;  trange(2, 1) = 0.010;
-    trange(3, 0) = 0.64;  trange(3, 1) = 0.010;
-    trange(4, 0) = 0.62;  trange(4, 1) = 0.010;
-    trange(5, 0) = 0.60;  trange(5, 1) = 0.010;
-    trange(6, 0) = 0.58;  trange(6, 1) = 0.010;
-    trange(7, 0) = 0.10;  trange(7, 1) = 0.005;
+    RealMatrix trange(6, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
+    trange(0, 0) = 0.68;  trange(0, 1) = 0.010;
+    trange(1, 0) = 0.66;  trange(1, 1) = 0.010;
+    trange(2, 0) = 0.64;  trange(2, 1) = 0.010;
+    trange(3, 0) = 0.62;  trange(3, 1) = 0.010;
+    trange(4, 0) = 0.60;  trange(4, 1) = 0.010;
+    trange(5, 0) = 0.10;  trange(5, 1) = 0.005;
     
     Context ctx = {sys, trange};
     
@@ -737,12 +741,14 @@ int main(int argc, char** argv) {
     //ctx.sys.plotGreenFunction();
     //ctx.sys.plotTransmissionStates();
     
-    const int nseed = 500;  // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
-    const int nthread = 8; // Number of threads used in multithreading with OpenMP.
+    const int nseed = 1000;  // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
+    const int nthread = 10;  // Number of threads used in multithreading with OpenMP.
     
-    //taskTransmissionSerial(ctx.sys, ctx.trange, nseed);
-    taskTransmissionOMP(ctx.sys, ctx.trange, nseed, nthread);
-    //taskAverageIntensitySerial(ctx.sys, nseed);
+    //taskITransmissionSerial(ctx.sys, ctx.trange, nseed);
+    taskITransmissionOMP(ctx.sys, ctx.trange, nseed, nthread);
+    //taskIIsotropicSerial(ctx.sys, nseed);
+    //taskIIsotropicOMP(ctx.sys, nseed, nthread); // To be implemented.....................
+    //taskIPlaneOMP(ctx.sys, nseed, nthread); // To be implemented.....................
     
     // Posterior checking operations (reusing available solution):
     //ctx.sys.checkResidual();

@@ -86,13 +86,13 @@ class WaveSystem {
     void reflectionMatrix(ComplexMatrix& rmat);
     void checkUnitarity(const bool showtval);
     void checkResidual();
-    void transmissionStates(ComplexMatrix& tstate, RealMatrix& tval);
-    void addTransmissionProfiles(const RealMatrix& trange, RealMatrix& tprofile, RealMatrix& nsample, RealMatrix& tval);
-    void addAverageIntensity(RealMatrix& ibar);
+    void addITransmission(const RealMatrix& trange, RealMatrix& tprofile, RealMatrix& nsample, RealMatrix& tval);
+    void addIIsotropic(RealMatrix& iavg);
+    void addIPlane(RealMatrix& iavg);
     
     private:
     
-    // Private setters (because the Hamiltonian should be recomputed afterwards):
+    // Private setters (because the Hamiltonian should be recomputed afterwards in principle):
     double checkWavenumber(const double kh) const;
     double checkScattering(const double holscat) const;
     double checkAbsorption(const double holabso) const;
@@ -103,6 +103,7 @@ class WaveSystem {
     int computeNOutputProp() const;
     void computeIOStates();
     void computeGreenFunction();
+    void computeTransmissionStates(ComplexMatrix& tstate, RealMatrix& tval);
     
 };
 
