@@ -640,7 +640,7 @@ void taskITransmissionOMP(WaveSystem& sys, RealMatrix& trange, const int nseed, 
 }
 
 /***************************************************************************************************
- * COMPUTATION OF MODE-AVERAGED INTENSITY
+ * COMPUTATION OF AVERAGED INTENSITY
  ***************************************************************************************************/
 
 /**
@@ -671,8 +671,117 @@ void taskIIsotropicSerial(WaveSystem& sys, const int nseed) {
     const double ctime = endProgressBar(start);
     
     // Save the data and plot:
-    const std::string info = "Intensity for isotropic input with Nseed=" + std::to_string(nseed) + ", Computation_time=" + std::to_string(ctime) + " s.";
-    sys.plotIntensity(iavg, info, "iavg");
+    const std::string info = "Intensity for isotropic input with Nseed=" + std::to_string(nseed) 
+        + ", Computation_time=" + std::to_string(ctime) + " s (serial).";
+    sys.plotIntensity(iavg, info, "iiso");
+}
+
+/**
+ * Compute the intensity corresponding to an isotropic (Lambertian) input state averaged over "nseed" realizations of the disorder.
+ * Save the results to files with automated names, and call external plot scripts.
+ * This version uses multithreading with OpenMP.
+ */
+void taskIIsotropicOMP(WaveSystem& sys, const int nseed, const int nthread) {
+    
+    const int npoint = sys.getNPoint();
+    RealMatrix iavg(npoint, 1);
+    
+    int cjob = 0; // Current number of completed jobs (i.e., realizations of the disorder).
+    const std::string msg = "Iisotropic, " + std::to_string(nthread) + " thr";
+    const auto start = std::chrono::steady_clock::now(); // Gets the current time.
+    
+    #pragma omp parallel num_threads(nthread)
+    {
+        WaveSystem sys_loc(sys); // Deep copy of the system on each thread (OMP private).
+        RealMatrix iavg_loc(npoint, 1);
+        
+        #pragma omp for schedule(dynamic)
+        for (int iseed = 0; iseed < nseed; iseed++) {// Loop over realizations of the disorder.
+            
+            sys_loc.setDisorder(iseed+1); // Avoid seed=0 for safety.
+            sys_loc.addIIsotropic(iavg_loc);
+            
+            // Critical section to print the progress bar:
+            #pragma omp critical
+            {
+                cjob++;
+                printProgressBar(cjob, nseed, msg, start);
+            }
+        }
+        
+        // Critical section to gather all data together:
+        #pragma omp critical
+        {
+            iavg += iavg_loc;
+        }
+    }
+    
+    // Normalize the disorder average:
+    for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points.
+        iavg(ipoint, 0) /= nseed;
+    }
+    
+    // End progress bar and compute the total time (in seconds):
+    const double ctime = endProgressBar(start);
+    
+    // Save the data and plot:
+    const std::string info = "Intensity for isotropic input with Nseed=" + std::to_string(nseed) 
+        + ", Computation_time=" + std::to_string(ctime) + " s, Nthread=" + std::to_string(nthread) + ".";
+    sys.plotIntensity(iavg, info, "iiso");
+}
+
+/**
+ * Compute the intensity corresponding to an incident input mode averaged over "nseed" realizations of the disorder.
+ * Save the results to files with automated names, and call external plot scripts.
+ * This version uses multithreading with OpenMP.
+ */
+void taskIModeOMP(WaveSystem& sys, const int imode, const int nseed, const int nthread) {
+    
+    const int npoint = sys.getNPoint();
+    RealMatrix iavg(npoint, 1);
+    
+    int cjob = 0; // Current number of completed jobs (i.e., realizations of the disorder).
+    const std::string msg = "Iplane, " + std::to_string(nthread) + " thr";
+    const auto start = std::chrono::steady_clock::now(); // Gets the current time.
+    
+    #pragma omp parallel num_threads(nthread)
+    {
+        WaveSystem sys_loc(sys); // Deep copy of the system on each thread (OMP private).
+        RealMatrix iavg_loc(npoint, 1);
+        
+        #pragma omp for schedule(dynamic)
+        for (int iseed = 0; iseed < nseed; iseed++) {// Loop over realizations of the disorder.
+            
+            sys_loc.setDisorder(iseed+1); // Avoid seed=0 for safety.
+            sys_loc.addIMode(iavg_loc, imode);
+            
+            // Critical section to print the progress bar:
+            #pragma omp critical
+            {
+                cjob++;
+                printProgressBar(cjob, nseed, msg, start);
+            }
+        }
+        
+        // Critical section to gather all data together:
+        #pragma omp critical
+        {
+            iavg += iavg_loc;
+        }
+    }
+    
+    // Normalize the disorder average:
+    for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points.
+        iavg(ipoint, 0) /= nseed;
+    }
+    
+    // End progress bar and compute the total time (in seconds):
+    const double ctime = endProgressBar(start);
+    
+    // Save the data and plot:
+    const std::string info = "Intensity for plane input with Imode=" + std::to_string(imode) + ", Nseed=" + std::to_string(nseed) 
+        + ", Computation_time=" + std::to_string(ctime) + " s, Nthread=" + std::to_string(nthread) + ".";
+    sys.plotIntensity(iavg, info, "imode");
 }
 
 /***************************************************************************************************
@@ -695,7 +804,8 @@ int main(int argc, char** argv) {
     //Context ctx = createWaveguideCorner30x20();
     
     // Create the system from a PNG image:
-    SquareMesh mesh("model/waveguide_30x20.png");
+    //SquareMesh mesh("model/waveguide_30x20.png");
+    SquareMesh mesh("model/waveguide_302x300.png");
     //SquareMesh mesh("model/double-guide-abso-sym_642x384.png");
     //SquareMesh mesh("model/double-guide-abso-shift-15_642x384.png");
     //SquareMesh mesh("model/maze_706x513.png");
@@ -709,22 +819,25 @@ int main(int argc, char** argv) {
     const double dscat = 8.6;  // Scattering depth, L/lscat. Default: dscat=8.6 (in order to get approximately dscat_eff=10).
     const double dabso = 0.;   // Absorption depth, L/labso.
     
-    const std::string sysname = "waveguide_30x20/dscat_" + to_string_prec(dscat, 6);
+    const std::string sysname = "waveguide_302x300/dscat_" + to_string_prec(dscat, 6);
     
     const double kh = 1.;  // Wavenumber times the lattice step. Recommended: kh = 1 -> lambda/h = 6.
-    const double holscat = dscat/28;
-    const double holabso = dabso/28;
+    const double holscat = dscat/300;
+    const double holabso = dabso/300;
     
     WaveSystem sys(sysname, mesh, kh, holscat, holabso);
     
-    RealMatrix trange(6, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    trange(0, 0) = 0.95;  trange(0, 1) = 0.05;
+    RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
+    trange(0, 0) = 0.98;  trange(0, 1) = 0.02;
+    trange(1, 0) = 0.94;  trange(1, 1) = 0.02;
+    trange(2, 0) = 0.90;  trange(2, 1) = 0.02;
+    trange(3, 0) = 0.10;  trange(3, 1) = 0.02;
     //trange(0, 0) = 0.68;  trange(0, 1) = 0.010;
-    trange(1, 0) = 0.66;  trange(1, 1) = 0.010;
-    trange(2, 0) = 0.64;  trange(2, 1) = 0.010;
-    trange(3, 0) = 0.62;  trange(3, 1) = 0.010;
-    trange(4, 0) = 0.60;  trange(4, 1) = 0.010;
-    trange(5, 0) = 0.10;  trange(5, 1) = 0.005;
+    //trange(1, 0) = 0.66;  trange(1, 1) = 0.010;
+    //trange(2, 0) = 0.64;  trange(2, 1) = 0.010;
+    //trange(3, 0) = 0.62;  trange(3, 1) = 0.010;
+    //trange(4, 0) = 0.60;  trange(4, 1) = 0.010;
+    //trange(5, 0) = 0.10;  trange(5, 1) = 0.005;
     
     Context ctx = {sys, trange};
     
@@ -740,14 +853,15 @@ int main(int argc, char** argv) {
     //ctx.sys.plotGreenFunction();
     //ctx.sys.plotTransmissionStates();
     
-    const int nseed = 100;  // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
+    const int nseed = 20;  // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
     const int nthread = 10;  // Number of threads used in multithreading with OpenMP.
+    const int imode = 0;  // Index of the mode in taskIModeOMP().
     
-    taskITransmissionSerial(ctx.sys, ctx.trange, nseed);
+    //taskITransmissionSerial(ctx.sys, ctx.trange, nseed);
     //taskITransmissionOMP(ctx.sys, ctx.trange, nseed, nthread);
     //taskIIsotropicSerial(ctx.sys, nseed);
-    //taskIIsotropicOMP(ctx.sys, nseed, nthread); // To be implemented.....................
-    //taskIPlaneOMP(ctx.sys, nseed, nthread); // To be implemented.....................
+    //taskIIsotropicOMP(ctx.sys, nseed, nthread);
+    taskIModeOMP(ctx.sys, imode, nseed, nthread);
     
     // Posterior checking operations (reusing available solution):
     //ctx.sys.checkResidual();

@@ -782,7 +782,38 @@ void WaveSystem::addIIsotropic(RealMatrix& iavg) {
         }
         intensity /= ninputprop;
         iavg(ipoint, 0) += intensity;
+        // Warning: this formula does not take into account multiple input leads.
     }
+}
+
+/**
+ * Compute the intensity corresponding to the given input mode "imode", and add it to the given data matrix.
+ * The intensity is normalized to get unit incident intensity.
+ */
+void WaveSystem::addIMode(RealMatrix& iavg, const int imode) {
+    
+    // 1. First check for possible errors:
+    if (iavg.getNrow() != npoint || iavg.getNcol() != 1) {
+        std::string msg = "In addIMode(): Invalid size of 'iavg'. Received ("
+                        + std::to_string(iavg.getNrow()) + ", " + std::to_string(iavg.getNcol()) + "), expected ("
+                        + std::to_string(npoint) + ", 1).";
+        throw std::invalid_argument(msg);
+    }
+    else if (imode < 0 || imode >= ninputprop) {
+        std::string msg = "In addIMode(): Invalid mode index 'imode'. Received "
+                        + std::to_string(imode) + ", expected in 0.." + std::to_string(ninputprop-1) + ".";
+        throw std::invalid_argument(msg);
+    }
+    
+    computeGreenFunction(); // Ensure that the Green function is computed.
+    
+    // Add the mode-averaged intensity:
+    dcomplex psi;
+    for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points of the mesh.
+        psi = green(ipoint, imode) * 2.*I*std::sqrt(ninput) * inputKlh(imode, 0).real();
+        iavg(ipoint, 0) += psi.real()*psi.real() + psi.imag()*psi.imag();
+    }
+    // Warning: this formula does not take into account multiple input leads.
 }
 
 /**
@@ -836,6 +867,7 @@ void WaveSystem::computeTransmissionStates(ComplexMatrix& tstate, RealMatrix& tv
             vh(istate, jmode) *= std::conj(I*std::sqrt(2.*ninputprop/(PI*dosinput))*std::sqrt(inputKlh(jmode, 0).real()));
             // Each column of "V" (row of V^H) is the transmission eigenstate (in modal representation).
             // Note that the real part, Re(inputKlh), strips the evanescent modes.
+            // Warning: this formula does not take into account multiple input leads.
         }
     }
     tstate = green * vh.conj();
@@ -919,8 +951,8 @@ void WaveSystem::addITransmission(const RealMatrix& trange, RealMatrix& tprofile
                         psi += green(ipoint, imode) * I*std::sqrt(2.*ninputprop/(PI*dosinput)) 
                              * std::sqrt(inputKlh(imode, 0).real()) * std::conj(vh(ival, imode));
                     }
-                    
                     tprofile(ipoint, iprofile) += psi.real()*psi.real() + psi.imag()*psi.imag();
+                    // Warning: this formula does not take into account multiple input leads.
                 }
                 nsample(iprofile, 0) += 1;  // Increments the number of found profiles.
             }

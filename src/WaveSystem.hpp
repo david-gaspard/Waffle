@@ -88,7 +88,7 @@ class WaveSystem {
     void checkResidual();
     void addITransmission(const RealMatrix& trange, RealMatrix& tprofile, RealMatrix& nsample, RealMatrix& tval);
     void addIIsotropic(RealMatrix& iavg);
-    void addIPlane(RealMatrix& iavg);
+    void addIMode(RealMatrix& iavg, const int imode);
     
     private:
     
