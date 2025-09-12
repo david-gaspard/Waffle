@@ -85,14 +85,15 @@ def plot_map(args):
     The data in the field file are assumed to have the form [x, y, north, south, east, west, f1, f2, ..., fn], where the components 'x' and 'y' are assumed to be integers, and the cardinal directions are the indices of nearest neighbors or boundary conditions.
     """
     ## Check if the number of arguments is correct:
-    if (len(args) != 4):
+    if (len(args) != 5):
         print(ct.TAG_ERROR + "Invalid number of arguments, doing nothing...")
-        print(ct.TAG_USAGE + args[0] + " MODE(lin|log) COLUMN_NAME FIELD_FILE")
+        print(ct.TAG_USAGE + args[0] + " MODE(lin|log) COLUMN_NAME UNIT_LENGTH FIELD_FILE")
         return 1
     
     mode = args[1]  ## Coloring mode ("lin" or "log").
-    column_name = args[2]  ## Interpret arg #1 as the name of the column in the field file.
-    field_file  = args[3]  ## Interpret arg #2 as the name of the field file.
+    column_name = args[2]  ## Column in the field file.
+    unit_length = float(eval(args[3]))  ## Unit length, typically the best estimate of h/lscat = (L/lscat)/(L/h).
+    field_file  = args[4]  ## File containing the field.
     file_path = os.path.splitext(field_file)[0] + "_" + column_name  ## The file path will be used to write new files.
     
     try:
@@ -103,7 +104,7 @@ def plot_map(args):
     
     data = list(csv.DictReader((line for line in fp if not line.startswith('%')), skipinitialspace=True))
     data_header = ct.get_header(fp, '%')
-    holscat = float(ct.get_value_in_string("h/lscat", data_header))  ## Extract the ratio h/lscat.
+    ##holscat = float(ct.get_value_in_string("h/lscat", data_header))  ## Extract the ratio h/lscat.
     
     ## Find out the bounds of the system:
     point = np.asarray([(int(p['x']), int(p['y'])) for p in data], dtype=int)
@@ -157,8 +158,8 @@ def plot_map(args):
     title={{{title}}},
     xlabel={{{xlabel}}},
     ylabel={{{ylabel}}},
-    xticklabel={{\\pgfmathparse{{{holscat}*\\tick}}$\\pgfmathprintnumber[fixed relative, precision=3]{{\\pgfmathresult}}$}}, %% Rescale ticks to get x/lscat = (x/h) * (h/lscat), with h/lscat={holscat}.
-    yticklabel={{\\pgfmathparse{{{holscat}*\\tick}}$\\pgfmathprintnumber[fixed relative, precision=3]{{\\pgfmathresult}}$}},
+    xticklabel={{\\pgfmathparse{{{unit_length}*\\tick}}$\\pgfmathprintnumber[fixed relative, precision=3]{{\\pgfmathresult}}$}}, %% Rescale ticks to get x/lscat = (x/h) * (h/lscat), with h/lscat={unit_length}.
+    yticklabel={{\\pgfmathparse{{{unit_length}*\\tick}}$\\pgfmathprintnumber[fixed relative, precision=3]{{\\pgfmathresult}}$}},
     colorbar, %% Enable colorbar.
     point meta min={vmin}, %% Set colorbar range.
     point meta max={vmax},
@@ -176,7 +177,7 @@ def plot_map(args):
         title = "\\textbf{Cmd:} \\detokenize{"+ " ".join(args) + "}",
         xlabel = "$x/\\ell$",
         ylabel = "$y/\\ell$",
-        holscat = holscat,
+        unit_length = unit_length,
         colorbar_string = colormap_to_tikz_code(cmap, 41, mode),
         boundary_style = plot_mesh.BOUNDARY_STYLE,
         boundary_code = plot_mesh.boundary_to_tikz_code(data),

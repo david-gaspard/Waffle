@@ -36,28 +36,26 @@
  * DONE: (18) Arthur 2025-09-04: For the paper, come back with the double waveguide case (with/without absorber), and compute the eigenstate profile
  *       and the transmission eigenvalue distribution. Test changing the numerical aperture of each of the guides...
  * DONE: (19) In Main: Possibly add parallelized taskTransmissionOMP(). Maybe MPI is more relevant, given the memory size of reference 1 Mpx simulations...
+ * DONE: (20) Modify plot_histo.py, plot_cut.py, plot_proj.py to output CSV files instead of writing data directly into TikZ files.
+ *            This will allow the simulations parameters in headers to be preserved as locally as possible.
  * 
- * TODO: Modify plot_histo.py, plot_cut.py, plot_proj.py to output CSV files instead of writing data directly into TikZ files.
- *       This will allow the simulations parameters in headers to be preserved as locally as possible.
+ * (21) Arthur 2025-09-11: Implement average intensity for a plane wave input in order to show the comparison in the paper.
+ *      In the code, make clear the distinction between Lambertian input and plane wave input.
  * 
- * TODO: Perform benchmark simulations (+ comparison with Usadel) for :
+ * (22) Perform benchmark simulations (+ comparison with Usadel) for :
  *      (A) Square waveguide 500x500, 
  *      (B) Slab transmission 300x900, equal size input and output,
  *      (C) Slab transmission 300x900, large input, small output,
  *      (D) Slab remission 300x900, 
  *      (E) Another geometry, maybe the double waveguide, the maze, the "random fiber", or simply the random cavity (to be discussed)...
  * 
- * (21) Arthur 2025-09-11: Implement average intensity for a plane wave input in order to show the comparison in the paper.
- *      In the code, make clear the distinction between Lambertian input and plane wave input.
- * 
- * (22) Arthur 2025-09-04: What happens if we add a non-scattering region in the center of the waveguide ?
+ * (23) Arthur 2025-09-04: What happens if we add a non-scattering region in the center of the waveguide ?
  *      We would have D(r) -> infty... What happens in the Usadel equation ?
  *      It would be funny to find a system with transmission eigenstate "opposite" to the average intensity (without shaping). 
  *      Such that maximum of the eigenstate corresponds to the minimum of the average intensity...
- * (23) Do no forget to implement the absorption (holabso != 0) using complex wavenumbers.
+ * (24) Do no forget to implement the absorption (holabso != 0) using complex wavenumbers.
  *      Check that the implementation is correct, maybe using the Green function, or the distribution rho(T) (which should match RecurGreen's results)...
- * 
- * (24) Arthur 2025-09-04: For the paper, come back on the geometrical interpretation of the Q space and the (theta,eta) parametrization...
+ * (25) Arthur 2025-09-04: For the paper, come back on the geometrical interpretation of the Q space and the (theta,eta) parametrization...
  */
 
 /**
@@ -697,7 +695,7 @@ int main(int argc, char** argv) {
     //Context ctx = createWaveguideCorner30x20();
     
     // Create the system from a PNG image:
-    //SquareMesh mesh("model/waveguide_30x20.png");
+    SquareMesh mesh("model/waveguide_30x20.png");
     //SquareMesh mesh("model/double-guide-abso-sym_642x384.png");
     //SquareMesh mesh("model/double-guide-abso-shift-15_642x384.png");
     //SquareMesh mesh("model/maze_706x513.png");
@@ -706,21 +704,22 @@ int main(int argc, char** argv) {
     //SquareMesh mesh("model/arched-guide_1002x750.png");
     //SquareMesh mesh("model/arched-guide-absorber_1002x750.png");
     //SquareMesh mesh("model/slab-guide_302x900.png");
-    SquareMesh mesh("model/slab-transmission-1_302x902.png");
+    //SquareMesh mesh("model/slab-transmission-1_302x902.png");
     
     const double dscat = 8.6;  // Scattering depth, L/lscat. Default: dscat=8.6 (in order to get approximately dscat_eff=10).
     const double dabso = 0.;   // Absorption depth, L/labso.
     
-    const std::string sysname = "slab-transmission-1_302x902/dscat_" + to_string_prec(dscat, 6);
+    const std::string sysname = "waveguide_30x20/dscat_" + to_string_prec(dscat, 6);
     
     const double kh = 1.;  // Wavenumber times the lattice step. Recommended: kh = 1 -> lambda/h = 6.
-    const double holscat = dscat/300;
-    const double holabso = dabso/300;
+    const double holscat = dscat/28;
+    const double holabso = dabso/28;
     
     WaveSystem sys(sysname, mesh, kh, holscat, holabso);
     
     RealMatrix trange(6, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    trange(0, 0) = 0.68;  trange(0, 1) = 0.010;
+    trange(0, 0) = 0.95;  trange(0, 1) = 0.05;
+    //trange(0, 0) = 0.68;  trange(0, 1) = 0.010;
     trange(1, 0) = 0.66;  trange(1, 1) = 0.010;
     trange(2, 0) = 0.64;  trange(2, 1) = 0.010;
     trange(3, 0) = 0.62;  trange(3, 1) = 0.010;
@@ -741,11 +740,11 @@ int main(int argc, char** argv) {
     //ctx.sys.plotGreenFunction();
     //ctx.sys.plotTransmissionStates();
     
-    const int nseed = 1000;  // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
+    const int nseed = 100;  // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
     const int nthread = 10;  // Number of threads used in multithreading with OpenMP.
     
-    //taskITransmissionSerial(ctx.sys, ctx.trange, nseed);
-    taskITransmissionOMP(ctx.sys, ctx.trange, nseed, nthread);
+    taskITransmissionSerial(ctx.sys, ctx.trange, nseed);
+    //taskITransmissionOMP(ctx.sys, ctx.trange, nseed, nthread);
     //taskIIsotropicSerial(ctx.sys, nseed);
     //taskIIsotropicOMP(ctx.sys, nseed, nthread); // To be implemented.....................
     //taskIPlaneOMP(ctx.sys, nseed, nthread); // To be implemented.....................

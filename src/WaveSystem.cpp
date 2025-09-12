@@ -307,7 +307,7 @@ void WaveSystem::plotIntensity(const RealMatrix& intensity, const std::string& d
     }
     ofs.close();  // Close the stream before calling an external script (this may cause I/O trouble).
     
-    std::string cmd("plot/plot_map.py lin I0 " + filename);
+    const std::string cmd = "plot/plot_map.py lin I0 " + std::to_string(holscat) +  " " + filename;
     std::cout << TAG_EXEC << cmd << "\n";
     if (std::system(cmd.c_str())) {
         std::cout << TAG_WARN << "The plot script returned an error.\n";
