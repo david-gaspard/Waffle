@@ -27,8 +27,10 @@ static const dcomplex I  = dcomplex(0.0, 1.0);  // Define the imaginary unit.
 
 // Physical and numerical constants:
 static const int    DIMENSION  = 2;         // Number of spatial dimensions of the mesh, which is always equal to 2 in the present program.
-static const double FREEDOS    = 1./(4*PI); // Free-space density of states in two dimensions. FREEDOS = nu = S_d k^(d-2) / 2*(2*pi)^d
+static const double DOSFREE    = 1./(4*PI); // Free-space density of states in two dimensions. FREEDOS = nu = S_d k^(d-2) / 2*(2*pi)^d
 static const double KLHMIN     = 1.0e-5;    // Minimum value of the longitudinal wavenumber k_l*h for a mode to be considered as "propagating" in an opening. Smaller values of k_l*h are considered evanescent.
+static const double EXTRAPOLEN_EXACT  = 0.818309886184;  // Diffusive extrapolation length in 2D. Exact: 0.818309886184. Std approx: V_d/(2*V_(d-1)) = pi/4 = 0.785398163397.
+static const double EXTRAPOLEN_APPROX = PI/4.;  // Diffusive extrapolation length in 2D. Exact: 0.818309886184. Std approx: V_d/(2*V_(d-1)) = pi/4 = 0.785398163397.
 static const double MEPS       = 1.11e-16;  // Machine epsilon in double precision, MEPS = 2^(-53).
 static const double SQRTEPS    = 1.053e-8;  // Square root of the machine epsilon in double precision, SQRTEPS = MEPS^(1/2) = 2^(-53/2), used for discrete derivatives with forward difference formula.
 static const double CBRTEPS    = 4.806e-6;  // Cubic root of the machine epsilon in double precision, CBRTEPS = MPS^(1/3) = 2^(-53/3), used for discrete derivatives with central difference formula.

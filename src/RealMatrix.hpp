@@ -39,6 +39,8 @@ class RealMatrix {
     // Mathematical operations:
     double norm() const;
     double sum() const;
+    double mean() const;
+    double stddev() const;
     double max() const;
     double min() const;
     RealMatrix transpose() const;

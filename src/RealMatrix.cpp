@@ -6,6 +6,7 @@
  ***/
 #include "RealMatrix.hpp"
 #include <algorithm>
+#include <numeric>
 #include <iostream>
 
 /**
@@ -112,16 +113,41 @@ double RealMatrix::norm() const {
 }
 
 /**
- * Computes the sum all all matrix elements of the present matrix.
+ * Computes the sum of all matrix elements of the present matrix.
  */
 double RealMatrix::sum() const {
     
-    double sum = 0.;
+    //double sum = 0.;
+    //
+    //for (int l = 0; l < nrow*ncol; l++) {// Loop over all elements.
+    //    sum += data[l];
+    //}
+    //return sum;
+    
+    return std::reduce(data, data + nrow*ncol);
+}
+
+/**
+ * Computes the mean of all matrix elements of the present matrix.
+ */
+double RealMatrix::mean() const {
+    return sum()/(static_cast<double>(nrow) * static_cast<double>(ncol));
+}
+
+/**
+ * Computes the standard deviation of all matrix elements of the present matrix.
+ */
+double RealMatrix::stddev() const {
+    
+    const double avg = mean();
+    double delta, sumsq = 0.;
     
     for (int l = 0; l < nrow*ncol; l++) {// Loop over all elements.
-        sum += data[l];
+        delta = data[l] - avg;
+        sumsq += delta * delta;
     }
-    return sum;
+    
+    return std::sqrt(sumsq/(static_cast<double>(nrow) * static_cast<double>(ncol)));
 }
 
 /**

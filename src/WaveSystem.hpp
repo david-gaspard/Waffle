@@ -34,7 +34,7 @@ class WaveSystem {
     int noutputprop;   // Number of propagating modes in the output lead(s).
     double dosinput;   // Density of states in the input lead(s).
     double dosoutput;  // Density of states in the input lead(s).
-    double dosfree;    // Free density of states on a square lattice. Exact value based on the elliptic integral K(k).
+    double doslattice; // Free density of states on a square lattice. Exact value based on the elliptic integral K(k).
     
     bool computed;     // Flag indicating if the Green function have been computed. "true" if "green" has been computed, "false" otherwise.
                        // This flag is set to "false" each time the Hamiltonian is modified by setDisorder(), and set to "true" by computeGreenFunction().

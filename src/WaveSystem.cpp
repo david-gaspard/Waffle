@@ -181,8 +181,8 @@ std::vector<std::string> WaveSystem::summary() const {
     smr.push_back("h/lscat=" + std::to_string(holscat) + ", h/labso=" + std::to_string(holabso)
         + ", Ninputprop/Ninput=" + std::to_string(ninputprop) + "/" + std::to_string(ninput) 
         + ", Noutputprop/Noutput=" + std::to_string(noutputprop) + "/" + std::to_string(noutput));
-    smr.push_back("DOSinput=" + std::to_string(dosinput) + ", DOSoutput=" + std::to_string(dosoutput) + ", DOSfree=" + std::to_string(dosfree) 
-           + ", Hamiltonian_sparse_density=" + std::to_string(100.*hamiltonian.density()) + "%");
+    smr.push_back("DOSinput=" + std::to_string(dosinput) + ", DOSoutput=" + std::to_string(dosoutput) + ", DOSlattice=" + std::to_string(doslattice)
+        + ", DOSfree=" + std::to_string(DOSFREE) + ", Hamiltonian_sparse_density=" + std::to_string(100.*hamiltonian.density()) + "%");
     return smr;
 }
 
@@ -448,7 +448,6 @@ void WaveSystem::computeHamiltonian() {
 
 /**
  * Assigns a realization of the disorder to the Hamiltonian.
- * Assumes no disorder in the openings.
  */
 void WaveSystem::setDisorder(const uint64_t seed) {
     //std::cout << TAG_INFO << "Setting disorder with seed=" << seed << "..." << std::endl;
@@ -458,7 +457,7 @@ void WaveSystem::setDisorder(const uint64_t seed) {
     dcomplex kh2 = dcomplex(kh*kh, MEPS);
     
     // Standard deviation of the random potential uh2 = U(x, y) * h^2 approximately producing the scattering strength h/lscat : 
-    const double sigma = std::sqrt(kh*holscat/(PI*dosfree));  
+    const double sigma = std::sqrt(kh*holscat/(PI*doslattice));
     
     std::mt19937_64 rng;  // Instantiate the standard Mersenne Twister random number generator (64-bit-return version).
     rng.seed(seed);       // Initialize the random generator with the given seed.
@@ -618,13 +617,13 @@ void WaveSystem::computeIOStates() {
     
     // Compute the exact free density of states on a square lattice:
     const double mkh = 1. - kh*kh/4.;
-    dosfree = ellipticK(1. - 1./(mkh*mkh))/(2.*PI*PI*mkh);
+    doslattice = ellipticK(1. - 1./(mkh*mkh))/(2.*PI*PI*mkh);
     
-    if (dosinput > 3.*dosfree) {
-        std::cout << TAG_WARN << "DOSinput=" << dosinput << " is large, meaning that an input lead resonates (inputKlh.real.min=" << inputKlh.real().min() << "). You may consider changing the number of input points...\n";
+    if (std::abs(dosinput - doslattice) > 0.05*doslattice) {// Tolerance of 5% on the DOS.
+        std::cout << TAG_WARN << "DOSinput=" << dosinput << " is different from DOSlattice=" << doslattice << ", meaning that an input lead resonates (inputKlh.real.min=" << inputKlh.real().min() << "). You may consider changing the wavenumber...\n";
     }
-    if (dosoutput > 3.*dosfree) {
-        std::cout << TAG_WARN << "DOSoutput=" << dosoutput << " is large, meaning that an output lead resonates (outputKlh.real.min=" << outputKlh.real().min() << "). You may consider changing the number of output points...\n";
+    if (std::abs(dosoutput - doslattice) > 0.05*doslattice) {// Tolerance of 5% on the DOS.
+        std::cout << TAG_WARN << "DOSoutput=" << dosoutput << " is different from DOSlattice=" << doslattice << ", meaning that an output lead resonates (outputKlh.real.min=" << outputKlh.real().min() << "). You may consider changing the wavenumber...\n";
     }
     
     // Measure the build time for information:
@@ -921,15 +920,18 @@ void WaveSystem::addITransmission(const RealMatrix& trange, RealMatrix& tprofile
     transmissionMatrix(tmat);  // We only need the transmission matrix, not the reflection matrix.
     
     svd(tmat, tval, u, vh);  // Perform the SVD. t = U S V^H  -->  t^H t = V S^2 V^H. 
-    // NB: Each row of V^H is the conjugate of a transmission eigenstate (in modal representation).
+    // NB: Each row of V^H is the conjugate of a transmission eigenstate (in modal representation). vh(ival, imode)
     
-    for (int i = 0; i < ntval; i++) {// Loop on the singular values.
-        tval(i, 0) = tval(i, 0)*tval(i, 0);  // Compute the transmission eigenvalues from the singular values.
+    //double a;
+    for (int ival = 0; ival < ntval; ival++) {// Loop on the singular values.
+        tval(ival, 0) = tval(ival, 0)*tval(ival, 0);  // Compute the transmission eigenvalues from the singular values.
     }
     
     // 3. Compute the square modulus of selected transmission eigenstates (second most time-consuming operation after the sparse system solution):
     double tm, dt, t;
     dcomplex psi;
+    //const dcomplex ampli = 2.*I*std::sqrt(ninputprop/(2*PI*dosinput)); // Old normalization deprecated because depending on the precise value of kh*ninput and thus possibly divergent for resonating input waveguide.
+    const dcomplex ampli = 2.*I*std::sqrt(ninputprop/(2*PI*doslattice)); // Normalization of transmission eigenstates such that the incident intensity is 1.
     
     for (int iprofile = 0; iprofile < nprofile; iprofile++) {// Loop over the desired eigenstate profiles.
         
@@ -948,8 +950,7 @@ void WaveSystem::addITransmission(const RealMatrix& trange, RealMatrix& tprofile
                     // Compute the transmission eigenstate associated to "t":
                     psi = 0.;
                     for (int imode = 0; imode < ninputprop; imode++) {// Loop over the input modes to construct the transmission eigenstate at "ipoint".
-                        psi += green(ipoint, imode) * I*std::sqrt(2.*ninputprop/(PI*dosinput)) 
-                             * std::sqrt(inputKlh(imode, 0).real()) * std::conj(vh(ival, imode));
+                        psi += green(ipoint, imode) * std::conj(vh(ival, imode)) * std::sqrt(inputKlh(imode, 0).real()) * ampli;
                     }
                     tprofile(ipoint, iprofile) += psi.real()*psi.real() + psi.imag()*psi.imag();
                     // Warning: this formula does not take into account multiple input leads.

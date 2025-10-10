@@ -51,7 +51,7 @@ def plot_proj(args):
     ## Compute the average projection along the 'x' direction:
     proj = np.zeros((nx, 2))
     for ix in range(nx):
-        proj[ix, 0] = (xmin + (xmax-xmin)*(float(ix)/(nx-1))) * unit_length
+        proj[ix, 0] = ((xmax-xmin)*(float(ix)/(nx-1)) + 0.5) * unit_length
     
     proj[:, 1] = np.nanmean(matrix, axis=0)  ## Compute the mean ignoring NaN values.
     
