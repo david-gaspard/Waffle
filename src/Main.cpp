@@ -78,375 +78,39 @@ struct Context {
 };
 
 /***************************************************************************************************
- * SYSTEM CREATION FUNCTIONS
+ * TEST ROUTINES
  ***************************************************************************************************/
 
 /**
- * Create a waveguide-shape system of given "length" and "width" (in number of lattice points),
- * and defines the range of transmission values of interest for computing the disorder-averaged profile of transmission eigenchannels. 
+ * Check the unitarity of the propagation for different realizations of the disorder in parallel.
+ * Thisfunction mainly serves as a parallelization test, especially to check the compatibility with MUMPS.
  */
-Context createWaveguide() {
-    
-    const int length = 300;   // Number of points in the longitudinal direction, L/h. Better to reach length=width=1000 with kh=1.
-    const int width  = 300;   // Number of points in the transverse direction, W/h.
-    
-    const double dscat = 8.5;  // Scattering depth, L/lscat. Default: dscat=8.5 (in order to get approximately dscat_eff=10).
-    const double dabso = 0.;   // Absorption depth, L/labso.
-    
-    const std::string name = "Waveguide_" + std::to_string(length) + "x" + std::to_string(width) + "/dscat_" + to_string_prec(dscat, 6);
-    
-    // Construct the mesh:
-    SquareMesh mesh;
-    mesh.addRectangle(0, length, 0, width, BND_MIRROR);
-    
-    // Setup boundary conditions:
-    mesh.setBoundaryRectangle(0, 0, 0, width, DIR_WEST, BND_INPUT);
-    mesh.setBoundaryRectangle(length, length, 0, width, DIR_EAST, BND_OUTPUT);
-    
-    mesh.finalize();
-    
-    // Defines the physical parameters:
-    const double kh = 1.;  // Wavenumber times the lattice step. Recommended: kh = 1 -> lambda/h = 6.
-    const double holscat = dscat/length;
-    const double holabso = dabso/length;
-    
-    RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    trange(0, 0) = 0.980;  trange(0, 1) = 0.020;
-    trange(1, 0) = 0.500;  trange(1, 1) = 0.050;
-    trange(2, 0) = 0.100;  trange(2, 1) = 0.020;
-    trange(3, 0) = 0.005;  trange(3, 1) = 0.001;
-    
-    return {WaveSystem(name, mesh, kh, holscat, holabso), trange};
-}
-
-/**
- * Create a slab system of given length and width.
- */
-Context createSlabTransmission1() {
-    
-    const int length  = 80;   // Number of lattice points in the longitudinal direction, L/h. Default: length=80
-    const int width   = 240;  // Number of lattice points in the transverse direction, W/h. Default: width=240
-    const int winput  = width/2;  // Width of the input channel. Default: winput=width/2
-    const int woutput = width/2;  // Width of the output channel. Default: woutput=width/2
-    
-    const double dscat = 8.5;  // Scattering depth, L/lscat.
-    const double dabso = 0.;  // Absorption depth, L/labso.
-    
-    const std::string name = "SlabTransmission1_" + std::to_string(length) + "x" + std::to_string(width) 
-                           + "_lead" + std::to_string(winput) + "/dscat_" + to_string_prec(dscat, 6);
-    
-    // Construct the mesh:
-    SquareMesh mesh;
-    mesh.addRectangle(0, length, -width/2, width/2, BND_OPEN);
-    
-    // Setup boundary conditions:
-    mesh.setBoundaryRectangle(0, 0, -winput/2, winput/2, DIR_WEST, BND_INPUT);
-    mesh.setBoundaryRectangle(length, length, -woutput/2, woutput/2, DIR_EAST, BND_OUTPUT);
-    
-    mesh.finalize();
-    
-    // Defines the physical parameters:
-    const double kh = 1.;  // Wavenumber times the lattice step. Recommended: kh = 1 -> lambda/h = 6.
-    const double holscat = dscat/length;
-    const double holabso = dabso/length;
-    
-    RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    trange(0, 0) = 0.800;  trange(0, 1) = 0.070;
-    trange(1, 0) = 0.300;  trange(1, 1) = 0.020;
-    trange(2, 0) = 0.100;  trange(2, 1) = 0.010;
-    trange(3, 0) = 0.005;  trange(3, 1) = 0.001;
-    
-    return {WaveSystem(name, mesh, kh, holscat, holabso), trange};
-}
-
-/**
- * Create a slab system of given length and width.
- */
-Context createSlabTransmission2() {
-    
-    const int length  = 80;      // Number of lattice points in the longitudinal direction, L/h. Default: length=80
-    const int width   = 240;     // Number of lattice points in the transverse direction, W/h. Default: width=240
-    const int winput  = width/2; // Width of the input channel. Default: winput=width/2
-    const int woutput = width/8; // Width of the output channel. Default: woutput=width/8.
-    
-    const double dscat = 8.5;  // Scattering depth, L/lscat.
-    const double dabso = 0.;  // Absorption depth, L/labso.
-    
-    const std::string name = "SlabTransmission2_" + std::to_string(length) + "x" + std::to_string(width) 
-                           + "_in" + std::to_string(winput) + "_out" + std::to_string(woutput) + "/dscat_" + to_string_prec(dscat, 6);
-    
-    // Construct the mesh:
-    SquareMesh mesh;
-    mesh.addRectangle(0, length, -width/2, width/2, BND_OPEN);
-    
-    // Setup boundary conditions:
-    mesh.setBoundaryRectangle(0, 0, -winput/2, winput/2, DIR_WEST, BND_INPUT);
-    mesh.setBoundaryRectangle(length, length, -woutput/2, woutput/2, DIR_EAST, BND_OUTPUT);
-    
-    mesh.finalize();
-    
-    // Defines the physical parameters:
-    const double kh = 1.;  // Wavenumber times the lattice step. Recommended: kh = 1 -> lambda/h = 6.
-    const double holscat = dscat/length;
-    const double holabso = dabso/length;
-    
-    RealMatrix trange(3, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    trange(0, 0) = 0.400;  trange(0, 1) = 0.050;
-    trange(1, 0) = 0.100;  trange(1, 1) = 0.010;
-    trange(2, 0) = 0.010;  trange(2, 1) = 0.001;
-    
-    return {WaveSystem(name, mesh, kh, holscat, holabso), trange};
-}
-
-/**
- * Create a slab system of given length and width.
- */
-Context createSlabTransmission3() {
-    
-    const int length  = 80;      // Number of lattice points in the longitudinal direction, L/h. Default: length=80
-    const int width   = 240;     // Number of lattice points in the transverse direction, W/h. Default: width=240
-    const int winput  = width/8; // Width of the input channel. Default: winput=width/2
-    const int woutput = width/8; // Width of the output channel. Default: woutput=width/8.
-    
-    const double dscat = 8.5;  // Scattering depth, L/lscat.
-    const double dabso = 0.;  // Absorption depth, L/labso.
-    
-    const std::string name = "SlabTransmission3_" + std::to_string(length) + "x" + std::to_string(width) 
-                           + "_lead" + std::to_string(winput) + "/dscat_" + to_string_prec(dscat, 6);
-    
-    // Construct the mesh:
-    SquareMesh mesh;
-    mesh.addRectangle(0, length, -width/2, width/2, BND_OPEN);
-    
-    // Setup boundary conditions:
-    mesh.setBoundaryRectangle(0, 0, -winput/2, winput/2, DIR_WEST, BND_INPUT);
-    mesh.setBoundaryRectangle(length, length, -woutput/2, woutput/2, DIR_EAST, BND_OUTPUT);
-    
-    mesh.finalize();
-    
-    // Defines the physical parameters:
-    const double kh = 1.;  // Wavenumber times the lattice step. Recommended: kh = 1 -> lambda/h = 6.
-    const double holscat = dscat/length;
-    const double holabso = dabso/length;
-    
-    RealMatrix trange(3, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    trange(0, 0) = 0.200;  trange(0, 1) = 0.050;
-    trange(1, 0) = 0.100;  trange(1, 1) = 0.010;
-    trange(2, 0) = 0.010;  trange(2, 1) = 0.001;
-    
-    return {WaveSystem(name, mesh, kh, holscat, holabso), trange};
-}
-
-/**
- * Create a slab system in remission configuration.
- */
-Context createSlabRemission1() {
-    
-    const int length  = 80;      // Number of lattice points in the longitudinal direction, L/h. Default: length=80
-    const int width   = 240;     // Number of lattice points in the transverse direction, W/h. Default: width=240
-    const int winput  = width/8; // Width of the input channel. Default: winput=width/2
-    const int woutput = width/8; // Width of the output channel. Default: woutput=width/8.
-    const int ysep    = width/3; // Separation between the centers of the input and the output.
-    
-    const double dscat = 8.5;  // Scattering depth, L/lscat.
-    const double dabso = 0.;   // Absorption depth, L/labso.
-    
-    const std::string name = "SlabRemission_" + std::to_string(length) + "x" + std::to_string(width) 
-                           + "_lead" + std::to_string(winput) + "_sep" + std::to_string(ysep) + "/dscat_" + to_string_prec(dscat, 6);
-    
-    // Construct the mesh:
-    SquareMesh mesh;
-    mesh.addRectangle(0, length, -width/2, width/2, BND_OPEN);
-    
-    // Setup boundary conditions:
-    mesh.setBoundaryDisk(0, -ysep/2,  winput/2, DIR_WEST, BND_INPUT);
-    mesh.setBoundaryDisk(0, +ysep/2, woutput/2, DIR_WEST, BND_OUTPUT);
-    
-    mesh.finalize();
-    
-    // Defines the physical parameters:
-    const double kh = 1.;  // Wavenumber times the lattice step. Recommended: kh = 1 -> lambda/h = 6.
-    const double holscat = dscat/length;
-    const double holabso = dabso/length;
-    
-    RealMatrix trange(3, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    trange(0, 0) = 0.100;  trange(0, 1) = 0.030;
-    trange(1, 0) = 0.050;  trange(1, 1) = 0.010;
-    trange(2, 0) = 0.010;  trange(2, 1) = 0.002;
-    
-    return {WaveSystem(name, mesh, kh, holscat, holabso), trange};
-}
-
-/**
- * Create a double waveguide with a minute asymmetry.
- */
-Context createDoubleWaveguide1() {
-    
-    const int tlength = 300;          // Number of lattice points in the longitudinal direction, L/h.
-    const int twidth  = 300;          // Number of lattice points in the transverse direction, W/h.
-    const int xwidth  = tlength/5;    // Width of the corridors near input/output.
-    const int ywidth  = twidth/5;     // Width of the corridors of the two waveguides (before the yshift).
-    const int yshift  = twidth/50;    // Transverse shift.
-    
-    const double dscat = 8.5;  // Scattering depth, L/lscat.
-    const double dabso = 0.;   // Absorption depth, L/labso.
-    
-    const std::string name = "DoubleWaveguide1_" + std::to_string(tlength) + "x" + std::to_string(twidth) 
-                           + "_cx" + std::to_string(xwidth) + "_cy" + std::to_string(ywidth) + "_yshift" + std::to_string(yshift) 
-                           + "/dscat_" + to_string_prec(dscat, 6);
-    
-    // Construct the mesh:
-    SquareMesh mesh;
-    mesh.addRectangle(0, tlength, 0, twidth, BND_MIRROR);
-    mesh.removeRectangle(xwidth, tlength-xwidth, ywidth+yshift, twidth-ywidth+yshift);
-    
-    // Setup boundary conditions:
-    mesh.setBoundaryRectangle(0, 0, 0, twidth, DIR_WEST, BND_INPUT);
-    mesh.setBoundaryRectangle(tlength, tlength, 0, twidth, DIR_EAST, BND_OUTPUT);
-    mesh.setBoundaryRectangle(xwidth-1, xwidth-1, ywidth+yshift, twidth-ywidth+yshift, DIR_EAST, BND_OPEN);
-    
-    mesh.finalize();
-    
-    // Defines the physical parameters:
-    const double kh = 1.;  // Wavenumber times the lattice step. Recommended: kh = 1 -> lambda/h = 6.
-    const double holscat = dscat/tlength;
-    const double holabso = dabso/tlength;
-    
-    RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    trange(0, 0) = 0.880;  trange(0, 1) = 0.010;  //trange(0, 0) = 0.880;  trange(0, 1) = 0.030;
-    trange(1, 0) = 0.730;  trange(1, 1) = 0.030;
-    trange(2, 0) = 0.500;  trange(2, 1) = 0.020;
-    trange(3, 0) = 0.100;  trange(3, 1) = 0.010;
-    
-    return {WaveSystem(name, mesh, kh, holscat, holabso), trange};
-}
-
-/**
- * Create a double waveguide with a minute asymmetry.
- */
-Context createDoubleWaveguide2() {
-    
-    const int tlength = 300;          // Number of lattice points in the longitudinal direction, L/h.
-    const int twidth  = 300;          // Number of lattice points in the transverse direction, W/h.
-    const int xwidth  = tlength/5;    // Width of the corridors near input/output.
-    const int ywidth  = twidth/5;     // Width of the corridors of the two waveguides (before the yshift).
-    const int yshift  = twidth/50;    // Transverse shift.
-    
-    const double dscat = 8.5;  // Scattering depth, L/lscat.
-    const double dabso = 0.;   // Absorption depth, L/labso.
-    
-    const std::string name = "DoubleWaveguide2_" + std::to_string(tlength) + "x" + std::to_string(twidth) 
-                           + "_cx" + std::to_string(xwidth) + "_cy" + std::to_string(ywidth) + "_yshift" + std::to_string(yshift) 
-                           + "/dscat_" + to_string_prec(dscat, 6);
-    
-    // Construct the mesh:
-    SquareMesh mesh;
-    mesh.addRectangle(0, tlength, 0, twidth, BND_MIRROR);
-    mesh.removeRectangle(xwidth, tlength-xwidth, ywidth+yshift, twidth-ywidth+yshift);
-    
-    // Setup boundary conditions:
-    mesh.setBoundaryRectangle(0, 0, 0, twidth, DIR_WEST, BND_INPUT);
-    mesh.setBoundaryRectangle(tlength, tlength, 0, twidth, DIR_EAST, BND_OUTPUT);
-    
-    mesh.finalize();
-    
-    // Defines the physical parameters:
-    const double kh = 1.;  // Wavenumber times the lattice step. Recommended: kh = 1 -> lambda/h = 6.
-    const double holscat = dscat/tlength;
-    const double holabso = dabso/tlength;
-    
-    RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    trange(0, 0) = 0.980;  trange(0, 1) = 0.020;
-    trange(1, 0) = 0.880;  trange(1, 1) = 0.030;
-    trange(2, 0) = 0.730;  trange(2, 1) = 0.030;
-    trange(3, 0) = 0.500;  trange(3, 1) = 0.020;
-    
-    return {WaveSystem(name, mesh, kh, holscat, holabso), trange};
-}
-
-/**
- * Create a mesh shaped as the Eiffel Tower.
- */
-Context createEiffelTower402x877() {
-    
-    const std::string pngfile = "model/eiffel-tower_402x877.png";
-    //const std::string pngfile = "model/eiffel-tower_402x877_test1.png";
-    SquareMesh mesh(pngfile);
-    
-    const double dscat = 8.5;  // Scattering depth, L/lscat.
-    const double dabso = 0.;   // Absorption depth, L/labso.
-    
-    const std::string name = "EiffelTower_402x877/dscat_" + to_string_prec(dscat, 6);
-    
-    // Defines the physical parameters:
-    const double kh = 1.;  // Wavenumber times the lattice step. Recommended: kh = 1 -> lambda/h = 6.
-    const double holscat = dscat/877;
-    const double holabso = dabso/877;
-    
-    RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    trange(0, 0) = 0.980;  trange(0, 1) = 0.020;
-    trange(1, 0) = 0.580;  trange(1, 1) = 0.030;
-    trange(2, 0) = 0.330;  trange(2, 1) = 0.030;
-    trange(3, 0) = 0.100;  trange(3, 1) = 0.020;
-    
-    return {WaveSystem(name, mesh, kh, holscat, holabso), trange};
-}
-
-/**
- * Create a mesh shaped as the Eiffel Tower.
- */
-Context createSmallTest7x7() {
-    
-    const std::string pngfile = "model/small-test_7x7.png";
-    SquareMesh mesh(pngfile);
-    
-    const double dscat = 1.;  // Scattering depth, L/lscat.
-    const double dabso = 0.;   // Absorption depth, L/labso.
-    
-    const std::string name = "SmallTest_7x7/dscat_" + to_string_prec(dscat, 6);
-    
-    // Defines the physical parameters:
-    const double kh = 1.;  // Wavenumber times the lattice step. Recommended: kh = 1 -> lambda/h = 6.
-    const double holscat = dscat/5;
-    const double holabso = dabso/5;
-    
-    RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    trange(0, 0) = 0.980;  trange(0, 1) = 0.020;
-    trange(1, 0) = 0.580;  trange(1, 1) = 0.030;
-    trange(2, 0) = 0.330;  trange(2, 1) = 0.030;
-    trange(3, 0) = 0.100;  trange(3, 1) = 0.020;
-    
-    return {WaveSystem(name, mesh, kh, holscat, holabso), trange};
-}
-
-/**
- * Create a waveguide with a corner in the output lead.
- */
-Context createWaveguideCorner30x20() {
-    
-    const std::string pngfile = "model/waveguide-corner_30x20.png";
-    //const std::string pngfile = "model/waveguide_30x20.png";
-    //const std::string pngfile = "model/waveguide-partial_30x20.png";
-    //const std::string pngfile = "model/waveguide-step_30x20.png";
-    SquareMesh mesh(pngfile);
-    
-    const double dscat = 1.;  // Scattering depth, L/lscat.
-    const double dabso = 0.;   // Absorption depth, L/labso.
-    
-    const std::string name = "WaveguideCorner_30x20/dscat_" + to_string_prec(dscat, 6);
-    
-    // Defines the physical parameters:
-    const double kh = 1.;  // Wavenumber times the lattice step. Recommended: kh = 1 -> lambda/h = 6.
-    const double holscat = dscat/30;
-    const double holabso = dabso/30;
-    
-    RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    trange(0, 0) = 0.980;  trange(0, 1) = 0.020;
-    trange(1, 0) = 0.580;  trange(1, 1) = 0.030;
-    trange(2, 0) = 0.330;  trange(2, 1) = 0.030;
-    trange(3, 0) = 0.100;  trange(3, 1) = 0.020;
-    
-    return {WaveSystem(name, mesh, kh, holscat, holabso), trange};
+void taskCheckUnitarityOMP(const WaveSystem& sys, const int nseed, const int seed0, const int nthread) {
+    
+    const bool showtval = false; // Show the transmission eigenvalues or not.
+    const std::string msg = "checkUnitarity, " + std::to_string(nthread) + " thr";
+    int cjob = 0;
+    const auto start = std::chrono::steady_clock::now(); // Gets the current time.
+    
+    #pragma omp parallel num_threads(nthread)
+    {
+        WaveSystem sys_loc(sys); // Deep copy of the system on each thread (OMP private).
+        
+        #pragma omp for schedule(static)
+        for (int iseed = 0; iseed < nseed; iseed++) {// Loop over realizations of the disorder.
+            
+            sys_loc.setDisorder(seed0 + iseed); // Avoid seed=0 for safety.
+            sys_loc.checkUnitarity(showtval);
+            
+            // Critical section to print the progress bar:
+            #pragma omp critical
+            {
+                cjob++;
+                printProgressBar(cjob, nseed, msg, start);
+            }
+        }
+    }
+    endProgressBar(start);
 }
 
 /***************************************************************************************************
@@ -918,22 +582,11 @@ int main(int argc, char** argv) {
     
     std::cout << "****** This is " << PROGRAM_COPYRIGHT << " ******\n";
     
-    // Create the simulation context:
-    //Context ctx = createWaveguide();
-    //Context ctx = createSlabTransmission1();
-    //Context ctx = createSlabTransmission2();
-    //Context ctx = createSlabTransmission3();
-    //Context ctx = createSlabRemission1();
-    //Context ctx = createDoubleWaveguide1();
-    //Context ctx = createDoubleWaveguide2();
-    //Context ctx = createEiffelTower402x877();
-    //Context ctx = createSmallTest7x7();
-    //Context ctx = createWaveguideCorner30x20();
-    
     // Create the system from a PNG image:
     //SquareMesh mesh("model/waveguide_30x20.png");
     //SquareMesh mesh("model/waveguide_302x300.png"); // Currently standard waveguide.
-    SquareMesh mesh("model/waveguide_602x600.png");
+    //SquareMesh mesh("model/waveguide_602x600.png");
+    //SquareMesh mesh("model/waveguide_1202x1200.png");
     //SquareMesh mesh("model/double-guide-abso-sym_642x384.png");
     //SquareMesh mesh("model/double-guide-abso-shift-15_642x384.png");
     //SquareMesh mesh("model/maze_706x513.png");
@@ -941,6 +594,7 @@ int main(int argc, char** argv) {
     //SquareMesh mesh("model/ring-guide_700x700.png");
     //SquareMesh mesh("model/arched-guide_1002x750.png");
     //SquareMesh mesh("model/arched-guide-absorber_1002x750.png");
+    //SquareMesh mesh("model/slab-guide_152x450.png"); // Used for L/lscat calibration.
     //SquareMesh mesh("model/slab-guide_302x900.png"); // Used for L/lscat calibration.
     //SquareMesh mesh("model/slab-guide_602x600.png"); // Used for L/lscat calibration.
     //SquareMesh mesh("model/slab-guide_101x297.png");
@@ -956,8 +610,14 @@ int main(int argc, char** argv) {
     //SquareMesh mesh("model/slab-tm-ar9-in1-out1_102x902.png"); // Test the exponential decay of the profile in the transverse direction.
     //SquareMesh mesh("model/waveguide-obstacle_302x300.png");
     //SquareMesh mesh("model/waveguide_502x500.png");
+    //SquareMesh mesh("model/slab-remission_152x452.png");
+    //SquareMesh mesh("model/slab-tm-ar3-div15-in45-out5_152x452.png");
     //SquareMesh mesh("model/slab-tm-ar3-div15-in5-out5_302x902.png");  // Currently standard slab (for dscat_eff=20, dscat=16.40).
     //SquareMesh mesh("model/slab-tm-ar3-div15-in9-out9_302x902.png");
+    //SquareMesh mesh("model/shrinking-guide_602x1000.png");
+    //SquareMesh mesh("model/random-cavity-4-leads-1_600x385.png");
+    //SquareMesh mesh("model/waveguide-obstacle-sym_302x300.png");
+    SquareMesh mesh("model/year-2026_1762x578.png");
     
     /**
      * TABLE of effective scattering thickness for 300x900 slab waveguides with kh=1 and holscat=dscat/300:
@@ -1018,29 +678,29 @@ int main(int argc, char** argv) {
      * 16.27    20
      * 12.53    15
      */
-    const double dscat = 13.;  // Scattering depth, L/lscat.
+    const double dscat = 0.;  // Scattering depth, L/lscat.
     const double dabso = 0.;  // Absorption depth, L/labso.
     
     const double kh = 1.;  // Wavenumber times the lattice step. Avoid kh=1 because creates resonances when ninput = 3*integer + 2.
-    const double holscat = dscat/600;
-    const double holabso = dabso/600;
+    const double holscat = dscat/1750; // Value of h/lscat.
+    const double holabso = dabso/1750; // Value of h/labso.
+    const double density = 1.;  // Density of scatterers per pixel, between 0 and 1. Recommended is 1.
     
-    const std::string sysname = "waveguide_602x600/kh_" + to_string_prec(kh, 6) + "/dscat_" + to_string_prec(dscat, 6);
+    const std::string sysname = "year-2026_1762x578/kh_" + to_string_prec(kh, 6) + "/dscat_" + to_string_prec(dscat, 6);
     
-    WaveSystem sys(sysname, mesh, kh, holscat, holabso);
+    WaveSystem sys(sysname, mesh, kh, density, holscat, holabso);
+    
+    //RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
+    //trange(0, 0) = 0.998;  trange(0, 1) = 0.002;
+    //trange(1, 0) = 0.500;  trange(1, 1) = 0.01;
+    //trange(2, 0) = 0.100;  trange(2, 1) = 0.005;
+    //trange(3, 0) = 0.001;  trange(3, 1) = 0.00005;
     
     RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    trange(0, 0) = 0.998;  trange(0, 1) = 0.002;
-    trange(1, 0) = 0.500;  trange(1, 1) = 0.01;
-    trange(2, 0) = 0.100;  trange(2, 1) = 0.002;
-    trange(3, 0) = 0.001;  trange(3, 1) = 0.00005;
-    
-    //RealMatrix trange(5, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    //trange(0, 0) = 0.40;  trange(0, 1) = 0.025;
-    //trange(1, 0) = 0.35;  trange(1, 1) = 0.025;
-    //trange(2, 0) = 0.30;  trange(2, 1) = 0.025;
-    //trange(3, 0) = 0.25;  trange(3, 1) = 0.025;
-    //trange(4, 0) = 0.20;  trange(4, 1) = 0.025;
+    trange(0, 0) = 0.99;  trange(0, 1) = 0.01;
+    trange(1, 0) = 0.97;  trange(1, 1) = 0.01;
+    trange(2, 0) = 0.95;  trange(2, 1) = 0.01;
+    trange(3, 0) = 0.93;  trange(3, 1) = 0.01;
     
     //RealMatrix trange(5, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
     //trange(0, 0) = 0.50;  trange(0, 1) = 0.025;
@@ -1049,11 +709,12 @@ int main(int argc, char** argv) {
     //trange(3, 0) = 0.35;  trange(3, 1) = 0.025;
     //trange(4, 0) = 0.30;  trange(4, 1) = 0.025;
     
-    //RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    //trange(0, 0) = 0.16;  trange(0, 1) = 0.01;
-    //trange(1, 0) = 0.14;  trange(1, 1) = 0.01;
-    //trange(2, 0) = 0.12;  trange(2, 1) = 0.01;
-    //trange(3, 0) = 0.10;  trange(3, 1) = 0.01;
+    //RealMatrix trange(5, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
+    //trange(0, 0) = 0.06;  trange(0, 1) = 0.005;
+    //trange(1, 0) = 0.05;  trange(1, 1) = 0.005;
+    //trange(2, 0) = 0.04;  trange(2, 1) = 0.005;
+    //trange(3, 0) = 0.03;  trange(3, 1) = 0.005;
+    //trange(4, 0) = 0.02;  trange(4, 1) = 0.005;
     
     Context ctx = {sys, trange};
     
@@ -1071,16 +732,17 @@ int main(int argc, char** argv) {
     //ctx.sys.checkResidual();
     //ctx.sys.checkUnitarity(true);
     
-    const int nseed = 1000;  // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
+    const int nseed = 1;    // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
     const int seed0 = 1;     // First seed used to generate realizations of the disorder. Actual seed = [seed0, seed0 + 1, ..., seed0 + nseed - 1]. 
                              // NB: Avoid seed0=0 for safety (some random generators are singular for seed=0).
     const int nthread = 10;  // Number of threads used in multithreading with OpenMP.
     const int imode = 0;     // Index of the mode in taskIMode*() and taskIAllOMP().
     
+    //taskCheckUnitarityOMP(ctx.sys, nseed, seed0, nthread);
     //taskITransmissionSerial(ctx.sys, ctx.trange, nseed, seed0);
     //taskITransmissionOMP(ctx.sys, ctx.trange, nseed, seed0, nthread);
     //taskIIsotropicSerial(ctx.sys, nseed, seed0);
-    //taskIIsotropicOMP(ctx.sys, nseed, seed0 nthread);
+    //taskIIsotropicOMP(ctx.sys, nseed, seed0, nthread);
     //taskIModeOMP(ctx.sys, imode, nseed, seed0, nthread);
     taskIAllOMP(ctx.sys, ctx.trange, imode, nseed, seed0, nthread);
     

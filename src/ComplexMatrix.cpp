@@ -412,8 +412,9 @@ void svd(const ComplexMatrix& a, RealMatrix& s, ComplexMatrix& u, ComplexMatrix&
         throw std::runtime_error(msg);
     }
     else if (info > 0) {
-        std::string msg = "In svd(): The QR factorization did not converge. The SVD could not be computed.";
-        throw std::runtime_error(msg);
+        //std::string msg = "In svd(): The QR factorization did not converge. The SVD could not be computed.";
+        //throw std::runtime_error(msg);
+        std::cout << TAG_ERROR << "In svd(): The QR factorization did not converge. The SVD could not be computed." << std::endl;
     }
 }
 

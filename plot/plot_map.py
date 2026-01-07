@@ -156,7 +156,7 @@ def plot_map(args):
     vmax = matrix.max()
     
     #vmin = 0 ## Override the pair vmin/vmax with the values from the wave simulations (see Waffle).
-    #vmax = (25./9) * (11./5)
+    #vmax = 50.
     
     norm = mcol.Normalize(vmin=vmin, vmax=vmax)
     image = cmap(norm(matrix)) ## Create the bitmap image.

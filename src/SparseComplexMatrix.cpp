@@ -545,6 +545,46 @@ void solveUmfpack(const SparseComplexMatrix& a, const SparseComplexMatrix& b, Co
     delete[] breal;
     delete[] bimag;
     
+    // Check for possible UMFPACK errors:
+    if (info[UMFPACK_STATUS] != UMFPACK_OK) {
+        switch (static_cast<int>(info[UMFPACK_STATUS])) {
+            case UMFPACK_WARNING_singular_matrix:
+                std::cout << TAG_WARN << "In solveUmfpack(): UMFPACK warning, singular matrix...\n";
+                break;
+            case UMFPACK_WARNING_determinant_underflow:
+                std::cout << TAG_WARN << "In solveUmfpack(): UMFPACK warning, determinant underflow...\n";
+                break;
+            case UMFPACK_WARNING_determinant_overflow:
+                std::cout << TAG_WARN << "In solveUmfpack(): UMFPACK warning, determinant overflow...\n";
+                break;
+            case UMFPACK_ERROR_invalid_matrix:
+                std::cout << TAG_ERROR << "In solveUmfpack(): UMFPACK error, invalid matrix...\n";
+                break;
+            case UMFPACK_ERROR_invalid_Numeric_object:
+                std::cout << TAG_ERROR << "In solveUmfpack(): UMFPACK error, invalid Numeric object, probably a memory overflow...\n";
+                break;
+            case UMFPACK_ERROR_invalid_Symbolic_object:
+                std::cout << TAG_ERROR << "In solveUmfpack(): UMFPACK error, invalid Symbolic object, probably a memory overflow...\n";
+                break;
+            case UMFPACK_ERROR_out_of_memory:
+                std::cout << TAG_ERROR << "In solveUmfpack(): UMFPACK error, not enough memory...\n";
+                break;
+            case UMFPACK_ERROR_different_pattern:
+                std::cout << TAG_ERROR << "In solveUmfpack(): UMFPACK error. "
+                    << "The pattern of the matrix has changed between the symbolic and numeric factorization...\n";
+                break;
+            case UMFPACK_ERROR_invalid_system:
+                std::cout << TAG_ERROR << "In solveUmfpack(): UMFPACK error. "
+                    << "The 'sys' argument provided to one of the solve routines is invalid...\n";
+                break;
+            case UMFPACK_ERROR_internal_error:
+                std::cout << TAG_ERROR << "In solveUmfpack(): UMFPACK error, internal error (code=" << info[UMFPACK_STATUS] << ")...\n";
+                break;
+            default:
+                std::cout << TAG_WARN << "In solveUmfpack(): UMFPACK returned an error code (code=" << info[UMFPACK_STATUS] << ")...\n";
+        }
+    }
+    
     //double ctime_solution = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_solution).count();
     //std::cout << TAG_INFO << "solveUmfpack(): Solution time = " << ctime_solution << " s.\n";
 }

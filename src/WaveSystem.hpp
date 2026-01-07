@@ -22,6 +22,7 @@ class WaveSystem {
     SquareMesh mesh;   // Square mesh object.
     
     double kh;         // Wavenumber times the lattice step, 2*pi*h/lambda. Also the phase accumulated across a lattice step (in radian).
+    double density;    // Density of scattering pixels per unit pixel. Value between 0 and 1.
     double holscat;    // Lattice step divided by the scattering mean free path, h/lscat. Total length is not a well defined unit.
     double holabso;    // Lattice step divided by the absorption length, h/labso. Total length is not a well defined unit.
     
@@ -53,7 +54,7 @@ class WaveSystem {
     public:
     
     // Constructors/Destructors:
-    WaveSystem(const std::string& name, const SquareMesh& mesh, const double kh, const double holscat, const double holabso);
+    WaveSystem(const std::string& name, const SquareMesh& mesh, const double kh, const double density, const double holscat, const double holabso);
     
     // Getters:
     int getNPoint() const;
@@ -63,6 +64,7 @@ class WaveSystem {
     int getNInputProp() const;
     int getNOutputProp() const;
     double getWavenumber() const;
+    double getDensity() const;
     double getScattering() const;
     double getAbsorption() const;
     std::string getName() const;
@@ -94,6 +96,7 @@ class WaveSystem {
     
     // Private setters (because the Hamiltonian should be recomputed afterwards in principle):
     double checkWavenumber(const double kh) const;
+    double checkDensity(const double density) const;
     double checkScattering(const double holscat) const;
     double checkAbsorption(const double holabso) const;
     

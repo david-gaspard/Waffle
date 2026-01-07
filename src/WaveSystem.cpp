@@ -18,13 +18,15 @@
  * sysname = String containing the name of the system (typically describing the system geometry) which is used to generate file output.
  * mesh    = Square mesh object.
  * kh      = Wavenumber times the lattice step, 2*pi*h/lambda. Also the phase accumulated across a lattice step (in radian).
+ * density = Scatterer density per unit pixel. Between 0 and 1.
  * holscat = Lattice step divided by the scattering mean free path, h/lscat. Total length is not a well defined unit.
  * holabso = Lattice step divided by the absorption length, h/labso. Total length is not a well defined unit.
  */
-WaveSystem::WaveSystem(const std::string& sysname, const SquareMesh& mesh, const double kh, const double holscat, const double holabso) : 
+WaveSystem::WaveSystem(const std::string& sysname, const SquareMesh& mesh, const double kh, const double density, const double holscat, const double holabso) : 
         sysname(sysname),  // Use initializer list to allocate matrix sizes.
         mesh(mesh),
         kh(checkWavenumber(kh)),
+        density(checkDensity(density)),
         holscat(checkScattering(holscat)),
         holabso(checkAbsorption(holabso)),
         npoint(mesh.getNPoint()),
@@ -54,12 +56,22 @@ WaveSystem::WaveSystem(const std::string& sysname, const SquareMesh& mesh, const
  */
 double WaveSystem::checkWavenumber(const double kh) const {
     if (kh < 0.) {
-        throw std::invalid_argument("In setWavenumber(): Wavenumber cannot be negative.");
+        throw std::invalid_argument("In checkWavenumber(): Wavenumber cannot be negative.");
     }
     else if (kh > 2.) {
-        throw std::invalid_argument("In setWavenumber(): Wavenumber cannot exceed Nyquist-Shannon bound (kh<2).");
+        throw std::invalid_argument("In checkWavenumber(): Wavenumber cannot exceed Nyquist-Shannon bound (kh<2).");
     }
     return kh;
+}
+
+/**
+ * Check the validity of the given density, and returns it.
+ */
+double WaveSystem::checkDensity(const double density) const {
+    if (density < 0. || density > 1.) {
+        throw std::invalid_argument("In checkDensity(): Density must be between 0 and 1.");
+    }
+    return density;
 }
 
 /**
@@ -67,7 +79,7 @@ double WaveSystem::checkWavenumber(const double kh) const {
  */
 double WaveSystem::checkScattering(const double holscat) const {
     if (holscat < 0.) {
-        throw std::invalid_argument("In setScattering(): Scattering strength cannot be negative.");
+        throw std::invalid_argument("In checkScattering(): Scattering strength cannot be negative.");
     }
     else if (kh < holscat) {
         std::cout << TAG_WARN << "Scattering strength is large (k*lscat=" << kh/holscat << " <1). Localization may occur.\n";
@@ -136,6 +148,13 @@ double WaveSystem::getWavenumber() const {
 }
 
 /**
+ * Returns the density of scatterers per unit pixel.
+ */
+double WaveSystem::getDensity() const {
+    return density;
+}
+
+/**
  * Returns the value of "holscat" which is defined by h/lscat, where "h" is the lattice step
  * (the unit length) and "lscat" is the scattering mean free path.
  */
@@ -178,7 +197,7 @@ std::vector<std::string> WaveSystem::summary() const {
     std::vector<std::string> smr;
     smr.push_back("WaveSystem with sysname='" + sysname + "', Npoint=" + std::to_string(npoint) + ", kh=" + std::to_string(kh)
         + ", lambda/h=[" + std::to_string(PI/std::asin(kh/2)) + ", " + std::to_string(PI/(std::sqrt(2.)*std::asin(kh/std::sqrt(8.)))) + "]");
-    smr.push_back("h/lscat=" + std::to_string(holscat) + ", h/labso=" + std::to_string(holabso)
+    smr.push_back("density=" + std::to_string(density) + ", h/lscat=" + std::to_string(holscat) + ", h/labso=" + std::to_string(holabso)
         + ", Ninputprop/Ninput=" + std::to_string(ninputprop) + "/" + std::to_string(ninput) 
         + ", Noutputprop/Noutput=" + std::to_string(noutputprop) + "/" + std::to_string(noutput));
     smr.push_back("DOSinput=" + std::to_string(dosinput) + ", DOSoutput=" + std::to_string(dosoutput) + ", DOSlattice=" + std::to_string(doslattice)
@@ -457,17 +476,24 @@ void WaveSystem::setDisorder(const uint64_t seed) {
     dcomplex kh2 = dcomplex(kh*kh, MEPS);
     
     // Standard deviation of the random potential uh2 = U(x, y) * h^2 approximately producing the scattering strength h/lscat : 
-    const double sigma = std::sqrt(kh*holscat/(PI*doslattice));
+    const double sigma = std::sqrt(kh*holscat/(PI*doslattice*density));
+    //const double sigma = std::sqrt(kh*holscat/(PI*doslattice));
     
     std::mt19937_64 rng;  // Instantiate the standard Mersenne Twister random number generator (64-bit-return version).
     rng.seed(seed);       // Initialize the random generator with the given seed.
     std::normal_distribution<double> random_normal(0., sigma);
+    std::uniform_real_distribution<double> random_uniform(0., 1.);
     
     for (int i = 0; i < npoint; i++) {//Loop over the points of the mesh.
         
-        if (not mesh.getPoint(i).isOpening()) {// If the point is not in an opening.
-            uh2 = random_normal(rng);  // Generate a Gaussian random number with standard deviation "sigma".
-            hamiltonian(i, i) = -4. + kh2 - uh2;  // Add the diagonal element of the Hamiltonian H(i, i) = -4 + (k*h)^2 - U*h^2.
+        if (not mesh.getPoint(i).isOpening()) {// If the point is not in an opening, then modifies the potential.
+            if (random_uniform(rng) < density) {// If the pixel is a scattering pixel (probability given by 'density').
+                uh2 = random_normal(rng);  // Generate a Gaussian random number with standard deviation "sigma".
+            }
+            else {// Otherwise, then reset the value of the potential to zero.
+                uh2 = 0.;
+            }
+            hamiltonian(i, i) = -4. + kh2 - uh2;  // In any case, replace the diagonal element of the Hamiltonian H(i, i) = -4 + (k*h)^2 - U*h^2.
         }
     }
 }
@@ -705,6 +731,8 @@ void WaveSystem::reflectionMatrix(ComplexMatrix& rmat) {
 void WaveSystem::checkResidual() {
     
     computeGreenFunction();  // Ensure that the Green function has been computed (this does nothing if it is so).
+    
+    std::cout << TAG_INFO << "Computing the residual...\n";
     const ComplexMatrix inputState_product = hamiltonian * green; // Recompute the input state from the solution of the linear system.
     
     // Compare the matrices elementwise:

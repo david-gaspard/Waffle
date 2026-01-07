@@ -1,0 +1,9 @@
+#!/bin/bash
+## Created on 2025-10-17 at 10:53:26 CEST by David Gaspard (ORCID 0000-0002-4449-8782) <david.gaspard@espci.fr> under the MIT License.
+## Run file for the Waffle program including the environment variables.
+## When realizations of the disorder operate on different cores, it is recommended to set OpenBLAS on a single thread to avoid clogging the CPU.
+
+export OPENBLAS_NUM_THREADS=1
+
+./waffle
+
