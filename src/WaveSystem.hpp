@@ -80,7 +80,7 @@ class WaveSystem {
     void plotMesh() const;
     void plotIntensity(const RealMatrix& intensity, const std::string& description, const std::string& filename) const;
     void plotGreenFunction();
-    void plotTransmissionStates();
+    void plotTransmissionStates(const int nstate);
     
     // Public computational methods:
     void setDisorder(const uint64_t seed);

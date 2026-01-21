@@ -356,12 +356,19 @@ void WaveSystem::plotGreenFunction() {
 }
 
 /**
- * Save the square modulus of all transmission eigenstates to a CSV file and call an external script to plot them.
+ * Save the square modulus of the first transmission eigenstates to a CSV file and call an external script to plot them.
+ * "nstate" is the number of desired transmission eigenstates, starting from the largest transmission value.
  */
-void WaveSystem::plotTransmissionStates() {
+void WaveSystem::plotTransmissionStates(const int nstate) {
     
-    // 1. First compute the transmission eigenstates.
-    const int nstate = std::min(noutputprop, ninputprop);
+    // 1. First check for possible invalid values of "nstate":
+    if (nstate <= 0 || nstate > std::min(noutputprop, ninputprop)) {
+        std::string msg = "In plotTransmissionStates(): Invalid number of transmission eigenstates, received nstate=" + std::to_string(nstate) 
+                        + ", expected in 1.." + std::to_string(std::min(noutputprop, ninputprop)) + ".";
+        throw std::invalid_argument(msg);
+    }
+    
+    // 2. Compute the transmission eigenstates:
     ComplexMatrix tstate(npoint, nstate);
     RealMatrix tval(nstate, 1);
     computeTransmissionStates(tstate, tval);
@@ -848,23 +855,31 @@ void WaveSystem::addIMode(RealMatrix& iavg, const int imode) {
  * 
  * Arguments:
  * 
- * tstate  = On output, selected transmission eigenstates. Size: (npoint, min(ninputprop, noutputprop)).
- * tval    = On output, list of transmission eigenvalues. Size: (min(ninputprop, noutputprop), 1).
+ * tstate  = On output, selected transmission eigenstates. Size: (npoint, nstate).
+ * tval    = On output, list of transmission eigenvalues. Size: (nstate, 1).
+ * Note that "nstate" is the desired number of transmission eigenstates, starting from the largest transmission eigenvalue.
  */
 void WaveSystem::computeTransmissionStates(ComplexMatrix& tstate, RealMatrix& tval) {
     
     // 1. First check for possible errors:
-    const int ntval = std::min(ninputprop, noutputprop);
-    if (tstate.getNrow() != npoint || tstate.getNcol() != ntval) {
-        std::string msg = "In computeTransmissionStates(): Invalid size of 'tstate'. Received ("
-                        + std::to_string(tstate.getNrow()) + ", " + std::to_string(tstate.getNcol()) + "), expected ("
-                        + std::to_string(npoint) + ", " + std::to_string(ntval) + ").";
+    const int nstate = tval.getNrow(); // Desired number of transmission eigenstates (must be < nstate_max).
+    const int nstate_max = std::min(ninputprop, noutputprop); // Expected maximum number of transmission eigenstates.
+    
+    if (nstate <= 0 || nstate > nstate_max) {
+        std::string msg = "In computeTransmissionStates(): Invalid number of transmission eigenstates. Received "
+                        + std::to_string(nstate) + ", expected in 1.." + std::to_string(nstate_max) + ".";
         throw std::invalid_argument(msg);
     }
-    else if (tval.getNrow() != ntval || tval.getNcol() != 1) {
+    else if (tstate.getNrow() != npoint || tstate.getNcol() != nstate) {
+        std::string msg = "In computeTransmissionStates(): Invalid size of 'tstate'. Received ("
+                        + std::to_string(tstate.getNrow()) + ", " + std::to_string(tstate.getNcol()) + "), expected ("
+                        + std::to_string(npoint) + ", " + std::to_string(nstate) + ").";
+        throw std::invalid_argument(msg);
+    }
+    else if (tval.getNcol() != 1) {
         std::string msg = "In computeTransmissionStates(): Invalid size of 'tval'. Received ("
                         + std::to_string(tval.getNrow()) + ", " + std::to_string(tval.getNcol()) + "), expected ("
-                        + std::to_string(ntval) + ", 1).";
+                        + std::to_string(nstate) + ", 1).";
         throw std::invalid_argument(msg);
     }
     
@@ -873,11 +888,19 @@ void WaveSystem::computeTransmissionStates(ComplexMatrix& tstate, RealMatrix& tv
     transmissionMatrix(tmat);  // We only need the transmission matrix, not the reflection matrix.
     
     // 3. Perform the SVD of the transmission matrix:
-    ComplexMatrix u(noutputprop, noutputprop), vh(ninputprop, ninputprop);
-    svd(tmat, tval, u, vh);  // t = U S V^H  -->  t^H t = V S^2 V^H
+    ComplexMatrix u_full(noutputprop, noutputprop), vh_full(ninputprop, ninputprop), vh(nstate, ninputprop);
+    RealMatrix sigma(nstate_max, 1);
+    svd(tmat, sigma, u_full, vh_full);  // t = U S V^H  -->  t^H t = V S^2 V^H
     
-    for (int i = 0; i < ntval; i++) {// Loop on the singular values.
-        tval(i, 0) = tval(i, 0)*tval(i, 0);  // Compute the transmission eigenvalues from the singular values.
+    for (int istate = 0; istate < nstate; istate++) {// Loop on the singular values.
+        tval(istate, 0) = sigma(istate, 0)*sigma(istate, 0);  // Compute the transmission eigenvalues from the singular values.
+        for (int jmode = 0; jmode < ninputprop; jmode++) {// Loop over the input waveguide modes.
+            // Normalize the input state to get approximately unit incident intensity:
+            vh(istate, jmode) = vh_full(istate, jmode) * std::conj(I*std::sqrt(2.*ninputprop/(PI*doslattice))*std::sqrt(inputKlh(jmode, 0).real()));
+            // Each column of "V" (row of V^H) is the transmission eigenstate (in modal representation).
+            // Note that the real part, Re(inputKlh), strips the evanescent modes.
+            // Warning: this formula does not take into account multiple input leads.
+        }
     }
     
     //std::string filename;
@@ -888,15 +911,15 @@ void WaveSystem::computeTransmissionStates(ComplexMatrix& tstate, RealMatrix& tv
     // 4. Compute all the transmission eigenstates:
     computeGreenFunction();  // Ensure the Green function has been computed already (this line does nothing if it is so).
     
-    // Normalize the input state to get approximately unit incident intensity:
-    for (int jmode = 0; jmode < ninputprop; jmode++) {// Loop over the input waveguide modes.
-        for (int istate = 0; istate < ninputprop; istate++) {// Loop over the input transmission eigenstates.
-            vh(istate, jmode) *= std::conj(I*std::sqrt(2.*ninputprop/(PI*dosinput))*std::sqrt(inputKlh(jmode, 0).real()));
-            // Each column of "V" (row of V^H) is the transmission eigenstate (in modal representation).
-            // Note that the real part, Re(inputKlh), strips the evanescent modes.
-            // Warning: this formula does not take into account multiple input leads.
-        }
-    }
+    //// Normalize the input state to get approximately unit incident intensity:
+    //for (int jmode = 0; jmode < ninputprop; jmode++) {// Loop over the input waveguide modes.
+    //    for (int istate = 0; istate < ninputprop; istate++) {// Loop over the input transmission eigenstates.
+    //        vh(istate, jmode) *= std::conj(I*std::sqrt(2.*ninputprop/(PI*dosinput))*std::sqrt(inputKlh(jmode, 0).real()));
+    //        // Each column of "V" (row of V^H) is the transmission eigenstate (in modal representation).
+    //        // Note that the real part, Re(inputKlh), strips the evanescent modes.
+    //        // Warning: this formula does not take into account multiple input leads.
+    //    }
+    //}
     tstate = green * vh.conj();
 }
 

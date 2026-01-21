@@ -155,8 +155,8 @@ def plot_map(args):
     vmin = matrix.min() ## Extract the depth range of the field [vmin, vmax].
     vmax = matrix.max()
     
-    #vmin = 0 ## Override the pair vmin/vmax with the values from the wave simulations (see Waffle).
-    #vmax = 50.
+    ##vmin = 0 ## Override the pair vmin/vmax with the values from the wave simulations (see Waffle).
+    ##vmax = 35.
     
     norm = mcol.Normalize(vmin=vmin, vmax=vmax)
     image = cmap(norm(matrix)) ## Create the bitmap image.
