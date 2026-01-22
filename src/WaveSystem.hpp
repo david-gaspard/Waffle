@@ -44,12 +44,12 @@ class WaveSystem {
     SparseComplexMatrix hamiltonian;  // Hamiltonian matrix, i.e., discretization of the operator (d_x^2 + d_y^2 + k^2 + i*eps - U(x,y))*h^2 
                                       // involved in the calculation of the Green function. Size: (npoint, npoint).
     SparseComplexMatrix inputState;   // Matrix storing the input modes in columns, and used as the independent term of the linear system
-                                      // for the Green function. Size: (npoint, ninput).
-    SparseComplexMatrix outputState;  // Matrix storing the output modes in columns. Size: (npoint, noutput).
+                                      // for the Green function. Size: (npoint, ninputprop).
+    SparseComplexMatrix outputState;  // Matrix storing the output modes in columns. Size: (npoint, noutputprop).
     
-    ComplexMatrix inputKlh;   // Column matrix containing the longitudinal wavenumbers in each channel. Size: (ninput, 1).
-    ComplexMatrix outputKlh;  // Column matrix containing the longitudinal wavenumbers in each channel. Size: (noutput, 1).
-    ComplexMatrix green;  // Matrix containing in columns the Green functions associated to each input modes. Size: (npoint, ninput).
+    ComplexMatrix inputKlh;   // Column matrix containing the longitudinal wavenumbers in each channel. Size: (ninputprop, 1).
+    ComplexMatrix outputKlh;  // Column matrix containing the longitudinal wavenumbers in each channel. Size: (noutputprop, 1).
+    ComplexMatrix green;  // Matrix containing in columns the Green functions associated to each input modes. Size: (npoint, ninputprop).
     
     public:
     
@@ -74,12 +74,13 @@ class WaveSystem {
     // Print/save methods:
     void printSummary() const;
     void infoHamiltonian() const;
-    void plotHamiltonian() const;
-    void plotInputState() const;
-    void plotOutputState() const;
+    void plotMatrixHamiltonian() const;
+    void plotMatrixInputState() const;
+    void plotMatrixOutputState() const;
     void plotMesh() const;
     void plotIntensity(const RealMatrix& intensity, const std::string& description, const std::string& filename) const;
     void plotGreenFunction();
+    void plotInputModes(const int nmode);
     void plotTransmissionStates(const int nstate);
     
     // Public computational methods:

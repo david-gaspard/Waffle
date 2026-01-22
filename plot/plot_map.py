@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #-*- coding: utf-8 -*-
 ## Created on 2025-07-17 at 12:48:24 CEST by David Gaspard (ORCID 0000-0002-4449-8782) <david.gaspard@espci.fr> under the MIT License.
-## Python script to plot a scalar field defined over a square lattice with holes. The input data must have the form [x, y, f(x, z)].
+## Python script to plot a scalar field defined over a square lattice with holes. The input data must have the form [x, y, f(x, y)].
 import sys, os, datetime, csv
 import numpy as np
 import matplotlib.pyplot as mplt
@@ -70,8 +70,6 @@ cdict = {'red':   [(0.0, 1.0, 1.0),  # red decreases
 ##red_green_cm = LinearSegmentedColormap('RedGreen', cdict, N)
 
 
-
-
 def colormap_to_tikz_code(cmap, nsample, mode):
     """
     Returns a TikZ code version of the given colormap "cmap" using a given number of samples "nsample".
@@ -93,23 +91,12 @@ def colormap_to_tikz_code(cmap, nsample, mode):
     
     return string
 
-def plot_map(args):
+
+def array_from_file(field_file, column_name):
     """
-    Plots the given component args[1]='column_name' of the given CSV file args[2]='field_file'.
-    The data in the field file are assumed to have the form [x, y, north, south, east, west, f1, f2, ..., fn], where the components 'x' and 'y' are assumed to be integers, and the cardinal directions are the indices of nearest neighbors or boundary conditions.
+    Returns a two-dimensional array containing the function to plot extracted from the column "column_name" in the file "field_file".
+    This function also returns the horizontal bounds (xmin, xmax), the vertical bounds (ymin, ymax), and other data extracted from the file.
     """
-    ## Check if the number of arguments is correct:
-    if (len(args) != 5):
-        print(ct.TAG_ERROR + "Invalid number of arguments, doing nothing...")
-        print(ct.TAG_USAGE + args[0] + " MODE(lin|log) COLUMN_NAME UNIT_LENGTH FIELD_FILE")
-        return 1
-    
-    mode = args[1]  ## Coloring mode ("lin" or "log").
-    column_name = args[2]  ## Column in the field file.
-    unit_length = float(eval(args[3]))  ## Unit length, typically the best estimate of h/lscat = (L/lscat)/(L/h).
-    field_file  = args[4]  ## File containing the field.
-    file_path = os.path.splitext(field_file)[0] + "_" + column_name  ## The file path will be used to write new files.
-    
     try:
         fp = open(field_file, 'r')
     except IOError as e:
@@ -119,6 +106,7 @@ def plot_map(args):
     data = list(csv.DictReader((line for line in fp if not line.startswith('%')), skipinitialspace=True))
     data_header = ct.get_header(fp, '%')
     ##holscat = float(ct.get_value_in_string("h/lscat", data_header))  ## Extract the ratio h/lscat.
+    fp.close()
     
     ## Find out the bounds of the system:
     point = np.asarray([(int(p['x']), int(p['y'])) for p in data], dtype=int)
@@ -128,38 +116,37 @@ def plot_map(args):
     ymax = point[:, 1].max()
     nx = xmax - xmin + 1
     ny = ymax - ymin + 1
-    matrix = np.full((ny, nx), np.nan)
+    array = np.full((ny, nx), np.nan)
     
-    ## Loop on the points to write in 'matrix':
+    ## Loop on the points to write in 'array':
     for p in data:
         i = ymax - int(p['y'])
         j = int(p['x']) - xmin
-        matrix[i, j] = float(p[column_name])
-        ##print(ct.TAG_INFO + "matrix[", i, ",", j, "] = ", float(p[column_name]))
+        array[i, j] = float(p[column_name])
+        ##print(ct.TAG_INFO + "array[", i, ",", j, "] = ", float(p[column_name]))
     
-    matrix = np.ma.array(matrix, mask=np.isnan(matrix))  ## Use a mask to escape nan values.
-    if (mode == "log"):
-        matrix = np.log10(matrix)
+    array = np.ma.array(array, mask=np.isnan(array))  ## Use a mask to escape nan values.
     
+    return (array, xmin, xmax, ymin, ymax, data, data_header)
+
+
+def array_to_tikz(array, xmin, xmax, ymin, ymax, vmin, vmax, unit_length, data, data_header, mode, args, file_path):
+    """
+    Create a bitmap and a TikZ file importing this bitmap to plot the data.
+    This function calls an external script to compile the TikZ file.
+    """
     cmap_base = mplt.cm.turbo  ## Use 'turbo' colormap (recommended).
-    #cmap_base = mplt.cm.jet ## Use 'jet' colormap.
-    #cmap_base = SUNSET_CMAP  ## Use custom 'sunset' colormap.
-    cmap_color_list = [c for c in cmap_base.colors] ## Extrac the colors to resample the colormap.
+    #cmap = mplt.cm.jet ## Use 'jet' colormap.
+    #cmap = SUNSET_CMAP  ## Use custom 'sunset' colormap.
+    cmap_color_list = [c for c in cmap_base.colors] ## Extract the colors to resample the colormap.
     cmap_nodes = np.linspace(0., 1., len(cmap_color_list))
     cmap = mcol.LinearSegmentedColormap.from_list("turbo_resampled", list(zip(cmap_nodes, cmap_color_list)), N=1024)
-    #mplt.imshow(matrix, cmap=cmap)  ## Show the plot in live (optional).
+    #mplt.imshow(array, cmap=cmap)  ## Show the plot in live (optional).
     #mplt.colorbar()
     #mplt.show()
     
-    ## Find the bounds (vmin, vmax) of the charted function:
-    vmin = matrix.min() ## Extract the depth range of the field [vmin, vmax].
-    vmax = matrix.max()
-    
-    ##vmin = 0 ## Override the pair vmin/vmax with the values from the wave simulations (see Waffle).
-    ##vmax = 35.
-    
     norm = mcol.Normalize(vmin=vmin, vmax=vmax)
-    image = cmap(norm(matrix)) ## Create the bitmap image.
+    image = cmap(norm(array)) ## Create the bitmap image.
     ##print(ct.TAG_INFO + "vmin = ", vmin, ", vmax = ", vmax)
     
     ##pre, ext = os.path.splitext(field_file)
@@ -219,8 +206,53 @@ def plot_map(args):
     print(ct.TAG_INFO + "Writing TikZ file: '" + tikz_file + "'...")
     open(tikz_file, 'w').write(tikz_code)
     ct.compile_tikz(tikz_file) ## Compile the TikZ file.
+    return 0
+
+
+def plot_map(args):
+    """
+    Plots the given component args[1]='column_name' of the given CSV file args[2]='field_file'.
+    The data in the field file are assumed to have the form [x, y, north, south, east, west, f1, f2, ..., fn], where the components 'x' and 'y' are assumed to be integers, and the cardinal directions are the indices of nearest neighbors or boundary conditions.
+    """
+    ## Check if the number of arguments is correct:
+    if (len(args) != 6):
+        print(ct.TAG_ERROR + "Invalid number of arguments, doing nothing...")
+        print(ct.TAG_USAGE + args[0] + " MODE(lin|log) COLUMN_NAME UNIT_LENGTH VRANGE(auto|vmin:vmax) FIELD_FILE")
+        return 1
     
-    fp.close()
+    mode = args[1]  ## Coloring mode ("lin" or "log").
+    column_name = args[2]  ## Column in the field file.
+    unit_length = float(eval(args[3]))  ## Unit length, typically the best estimate of h/lscat = (L/lscat)/(L/h).
+    vrange = args[4]  ## Value range. Either "vmin:vmax" or "auto".
+    field_file  = args[5]  ## File containing the field.
+    file_path = os.path.splitext(field_file)[0] + "_" + column_name  ## The file path will be used to write new files.
+    
+    ## Check for possible invalid arguments:
+    if (mode != "lin" and mode != "log"):
+        print(ct.TAG_ERROR + "Invalid scale mode '" + mode + "', expected 'lin' or 'log', aborting...")
+        return 1
+    
+    if (unit_length <= 0.):
+        unit_length = 1.
+    
+    ## Extract the array to plot from the data file:
+    (array, xmin, xmax, ymin, ymax, data, data_header) = array_from_file(field_file, column_name)
+    
+    if (mode == "log"):
+        array = np.log10(array)
+    
+    ## Find the bounds (vmin, vmax) of the charted function:
+    if (vrange == "auto"):
+        vmin = array.min() ## If "auto" mode, then extract the depth range of the field [vmin, vmax].
+        vmax = array.max()
+    elif (":" in vrange):
+        vmin, vmax = sorted(list(map(eval, vrange.split(":"))))
+    else:
+        print(ct.TAG_ERROR + "Invalid value range, expected 'auto' or vmin:vmax (separated by colon), aborting...")
+        return 1
+    
+    ## Plot the array using a bitmap imported in TikZ:
+    array_to_tikz(array, xmin, xmax, ymin, ymax, vmin, vmax, unit_length, data, data_header, mode, args, file_path)
     return 0
 
 if (__name__ == '__main__'):
