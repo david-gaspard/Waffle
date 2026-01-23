@@ -33,16 +33,12 @@ def merge_segments(segments):
     ## 1. Merge segments:
     for i in range(len(segments)):
         if (not copied[i]):
-            for j in range(i+1, len(segments)):
-                if (segments[i][0] == segments[j][0] and not copied[j]):  ## If same kind of boundary condition.
-                    if (point_equal(segments[i][-1], segments[j][1])):
-                        segments[i].extend(segments[j][2:])
-                        copied[j] = True
-                        nmerge += 1
-                    elif (point_equal(segments[i][1], segments[j][-1])):
-                        segments[i][1:1] = segments[j][1:-1]
-                        copied[j] = True
-                        nmerge += 1
+            for j in range(len(segments)):
+                if (j != i and not copied[j] and segments[i][0] == segments[j][0] and point_equal(segments[i][1][-1], segments[j][1][0])): 
+                    ## If same kind of boundary condition and end points matches, then merge.
+                    segments[i][1] = np.concatenate((segments[i][1], segments[j][1][1:]))
+                    copied[j] = True
+                    nmerge += 1
     
     ## 2. Remove copied segments:
     for i in range(len(segments)-1, -1, -1):
@@ -53,54 +49,66 @@ def merge_segments(segments):
     
     return nmerge
 
-def cross2d(a, b):
+def distance_ortho(a, b, p):
     """
-    Compute the vector product between two 2D vectors.
+    Compute the orthogonal distance of point "p" with respect to the line segment (a, b).
+    This is the standard distance used in the Douglas-Peucker algorithm.
+    Note that "a", "b", and "p" are assumed to be numpy arrays (2D or 3D).
     """
-    return a[0] * b[1] - a[1] * b[0]
+    u = 0.
+    dab2 = np.dot(b-a, b-a)
+    if (dab2 > 1.0e-30):  ## Avoid dividing by zero when points are the same (a=b).
+        u = np.dot(p-a, b-a)/dab2
+    
+    if (u <= 0.):
+        d = np.linalg.norm(p - a)
+    elif (u >= 1.):
+        d = np.linalg.norm(p - b)
+    else:
+        d = np.linalg.norm(p - (a + (b-a)*u))
+    
+    return d
 
-def angle(p1, p2, p3):
+def find_most_distant(points, indices, epsilon):
     """
-    Compute the signed angle between the vector p1 -> p2 and the vector p2 -> p3.
-    The value is positive for counterclockwise rotations and negative otherwise.
-    Return the angle in degrees.
+    Find the most distant points from the subpath of "points" defined by the list of indices "indices".
     """
-    v1 = np.asarray(p2) - np.asarray(p1)
-    v2 = np.asarray(p3) - np.asarray(p2)
+    nadded = 0  ## Number of added points to the list "indices".
     
-    cosa = v1.dot(v2)/(np.linalg.norm(v1) * np.linalg.norm(v2))
-    sgn = 1 if cross2d(v1, v2) > 0 else -1
+    for iseg in range(len(indices)-1):  ## Loop over segments of the subpath.
+        ## Find the most distant point from the segment:
+        dmax = 0.
+        imax = 0.
+        for ip in range(indices[iseg]+1, indices[iseg+1]):
+            d = distance_ortho(points[indices[iseg]], points[indices[iseg+1]], points[ip])
+            if (d > dmax):
+                dmax = d
+                imax = ip
+        
+        ## If the most distant point is farther than epsilon, then save it:
+        if (dmax > epsilon):
+            indices.append(imax)
+            nadded += 1
     
-    return sgn * np.rad2deg(np.arccos(cosa))
+    indices.sort()  ## Sort the list of saved indices.
+    ##print("[INFO] Nadded = ", nadded)
+    return nadded != 0
 
-def simplify_segments(segments):
+def simplify_path_rdp(points, epsilon):
     """
-    Simplify the given list "segments" by removing the useless points, i.e., points which do not correspond to changes of direction.
-    List segments has the format: [["mirror", (x1, y1), (x2, y2), (x3, y3), ...], ["mirror", (x1, y1), ...], ["input", (x1, y1), ...], ["output", (x1, y1), ...], ...].
+    Simplify the path defined by "points" (list of 2D or 3D numpy arrays) using the Ramer-Douglas-Peucker algorithm.
+    The tolerance "epsilon" must be interpreted as the maximum suppression distance for points measured in terms of the function "dist(a, b, p)".
+    Greater "epsilon" makes more simplified paths.
     """
-    npoint = 0  ## Number of points.
-    ndel = 0    ## Total number of deleted points.
+    n = points.shape[0]  ## Get the total number of points.
+    indices = [0, n-1]  ## List of retained points.
     
-    ## Loop on individual segments:
-    for s in segments:
-        
-        useless = len(s) * [False]
-        npoint += len(s)-1
-        
-        ## 1. Detect useless points (if deflection is less than 1 deg):
-        for i in range(2, len(s)-1):
-            if (abs(angle(s[i-1], s[i], s[i+1])) < 1.):
-                useless[i] = True
-        
-        # 2. Remove useless points:
-        for i in range(len(s)-2, 1, -1):
-            if (useless[i]):
-                del s[i]
-                ndel += 1
+    while True:
+        if not find_most_distant(points, indices, epsilon):
+            break
     
-    ##print(ct.TAG_INFO + "Simplification result: Deleted", ndel, "over", npoint, "points (", (100.*ndel/npoint), "%).")
-    
-    return ndel
+    return points[indices]
+
 
 def boundary_to_tikz_code(data):
     """
@@ -109,32 +117,32 @@ def boundary_to_tikz_code(data):
     and the direction components can be either point indices or boundary conditions ('mirror', 'open', 'input', or 'output').
     """
     ## 1. Create a list of segments on the boundary. The boundary must be travelled in the clockwise direction:
-    segments = []  ## Format: [["mirror", (x1, y1), (x2, y2)], ["open", (x1, y1), (x2, y2)], ...]
+    segments = []  ## Format: [["mirror", ((x1, y1), (x2, y2))], ["open", ((x1, y1), (x2, y2))], ...]
     for p in data:
         if (not p['north'].isdigit()):
             x1 = int(p['x']) - 0.5
             y1 = int(p['y']) + 0.5
             x2 = int(p['x']) + 0.5
             y2 = int(p['y']) + 0.5
-            segments.append([p['north'], (x1, y1), (x2, y2)])
+            segments.append([p['north'], np.array([(x1, y1), (x2, y2)])])
         if (not p['south'].isdigit()):
             x1 = int(p['x']) + 0.5
             y1 = int(p['y']) - 0.5
             x2 = int(p['x']) - 0.5
             y2 = int(p['y']) - 0.5
-            segments.append([p['south'], (x1, y1), (x2, y2)])
+            segments.append([p['south'], np.array([(x1, y1), (x2, y2)])])
         if (not p['east'].isdigit()):
             x1 = int(p['x']) + 0.5
             y1 = int(p['y']) + 0.5
             x2 = int(p['x']) + 0.5
             y2 = int(p['y']) - 0.5
-            segments.append([p['east'], (x1, y1), (x2, y2)])
+            segments.append([p['east'], np.array([(x1, y1), (x2, y2)])])
         if (not p['west'].isdigit()):
             x1 = int(p['x']) - 0.5
             y1 = int(p['y']) - 0.5
             x2 = int(p['x']) - 0.5
             y2 = int(p['y']) + 0.5
-            segments.append([p['west'], (x1, y1), (x2, y2)])
+            segments.append([p['west'], np.array([(x1, y1), (x2, y2)])])
     
     ## 2. Merge the segments iteratively:
     while True:
@@ -143,15 +151,27 @@ def boundary_to_tikz_code(data):
             break
     
     ## 3. Simplify the path:
-    simplify_segments(segments)
+    epsilon = 1.3  ## Tolerance of the Ramer-Douglas-Peucker algorithm (value eps=1.3 is ok).
+    for seg in segments:
+        seg_simple = simplify_path_rdp(seg[1], epsilon)
+        ##print("[INFO] Simplification ", seg[1].shape[0], " -> ", seg_simple.shape[0])
+        seg[1] = seg_simple
     
     ## 4. Convert the path to TikZ code:
     string = "\\begin{scope}%% Draw boundaries\n"
     
-    for s in segments:
-        string += "\\draw[{bnd}] (axis cs:{x}, {y})".format(bnd=s[0], x=s[1][0], y=s[1][1])
-        for i in range(2, len(s)):
-            string += " -- (axis cs:{x}, {y})".format(x=s[i][0], y=s[i][1])
+    for seg in segments:
+        npoint = seg[1].shape[0]
+        closed = point_equal(seg[1][0], seg[1][-1])
+        if (closed):   ## If the path is closed, then ignore the last point.
+            npoint -= 1
+        string += "\\draw[{bnd}] (axis cs:{x}, {y})".format(bnd=seg[0], x=seg[1][0,0], y=seg[1][0,1])
+        for i in range(1, npoint): ## Loop on the points, excluding the first one.
+            string += " -- (axis cs:{x}, {y})".format(x=seg[1][i,0], y=seg[1][i,1])
+            if (i%6 == 5): ## Avoid too long lines.
+                string += "\n"
+        if (closed):
+            string += " -- cycle"
         string += ";\n"
     
     return string + "\\end{scope}%"
