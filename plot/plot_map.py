@@ -58,15 +58,15 @@ SUNSET_CMAP = SUNSET_CMAP.reversed() ## Reverse the colormap in order to get lar
                                      ## Note: Black on white is much more suitable for printing (since it reduces ink bleeding) and more efficient for reading (as reported by many studies) but, unfortunately, when it represents physical quantities it is less easy to interpret because white is generally associated with higher intensities.
 SUNSET_CMAP.set_bad('white', 0.) ## Set the color when nan is encountered. Args: (color, opacity).
 
-cdict = {'red':   [(0.0, 1.0, 1.0),  # red decreases
-                   (1.0, 0.0, 0.0)],
-
-         'green': [(0.0, 0.0, 0.0),  # green increases
-                   (1.0, 1.0, 1.0)],
-
-         'blue':  [(0.0, 0.0, 0.0),  # no blue at all
-                   (1.0, 0.0, 0.0)]}
-
+##cdict = {'red':   [(0.0, 1.0, 1.0),  # red decreases
+##                   (1.0, 0.0, 0.0)],
+##
+##         'green': [(0.0, 0.0, 0.0),  # green increases
+##                   (1.0, 1.0, 1.0)],
+##
+##         'blue':  [(0.0, 0.0, 0.0),  # no blue at all
+##                   (1.0, 0.0, 0.0)]}
+##
 ##red_green_cm = LinearSegmentedColormap('RedGreen', cdict, N)
 
 

@@ -332,11 +332,11 @@ void WaveSystem::plotIntensity(const RealMatrix& intensity, const std::string& d
         std::cout << TAG_WARN << "The plot script returned an error.\n";
     }
     
-    cmd = "plot/plot_map_avg.py lin " + std::to_string(nstate) + " " + std::to_string(holscat) +  " auto " + filename;
-    std::cout << TAG_EXEC << cmd << "\n";
-    if (std::system(cmd.c_str())) {
-        std::cout << TAG_WARN << "The plot script returned an error.\n";
-    }
+    //cmd = "plot/plot_map_avg.py lin " + std::to_string(nstate) + " " + std::to_string(holscat) +  " auto " + filename;
+    //std::cout << TAG_EXEC << cmd << "\n";
+    //if (std::system(cmd.c_str())) {
+    //    std::cout << TAG_WARN << "The plot script returned an error.\n";
+    //}
 }
 
 /**

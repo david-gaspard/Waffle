@@ -168,7 +168,7 @@ def boundary_to_tikz_code(data):
         string += "\\draw[{bnd}] (axis cs:{x}, {y})".format(bnd=seg[0], x=seg[1][0,0], y=seg[1][0,1])
         for i in range(1, npoint): ## Loop on the points, excluding the first one.
             string += " -- (axis cs:{x}, {y})".format(x=seg[1][i,0], y=seg[1][i,1])
-            if (i%6 == 5): ## Avoid too long lines.
+            if (i%6 == 5 and i != npoint-1): ## Avoid too long lines.
                 string += "\n"
         if (closed):
             string += " -- cycle"
