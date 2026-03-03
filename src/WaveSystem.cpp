@@ -412,7 +412,7 @@ void WaveSystem::plotTransmissionStates(const int nstate) {
     // 2. Then compute the square modulus of the transmission eigenstates:
     RealMatrix intensity(npoint, nstate);
     dcomplex psi;
-    for (int istate = 0; istate < nstate; istate++) {// Loop over the transmission eigenstates.
+    for (int istate = 0; istate < nstate; istate++) {// Loop over the first "nstate" transmission eigenstates.
         for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points.
             psi = tstate(ipoint, istate);
             intensity(ipoint, istate) = psi.real()*psi.real() + psi.imag()*psi.imag();
@@ -824,69 +824,6 @@ void WaveSystem::checkUnitarity(const bool showtval) {
 }
 
 /**
- * Compute the intensity corresponding to a isotropic mixture of all input modes, and add it to the given data matrix.
- * The intensity is normalized to get unit incident intensity.
- */
-void WaveSystem::addIIsotropic(RealMatrix& iavg) {
-    
-    // 1. First check for possible errors:
-    if (iavg.getNrow() != npoint || iavg.getNcol() != 1) {
-        std::string msg = "In addIIsotropic(): Invalid size of 'iavg'. Received ("
-                        + std::to_string(iavg.getNrow()) + ", " + std::to_string(iavg.getNcol()) + "), expected ("
-                        + std::to_string(npoint) + ", 1).";
-        throw std::invalid_argument(msg);
-    }
-    
-    computeGreenFunction(); // Ensure that the Green function is computed.
-    
-    // Add the mode-averaged intensity:
-    double intensity;
-    dcomplex psi;
-    for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points of the mesh.
-        
-        // Compute the mode-averaged intensity at the current position:
-        intensity = 0.;
-        for (int imode = 0; imode < ninputprop; imode++) {// Loop over the input modes to construct the transmission eigenstate at "ipoint".
-            psi = green(ipoint, imode) * I*std::sqrt(2.*ninputprop/(PI*dosinput)) * std::sqrt(inputKlh(imode, 0).real());
-            intensity += psi.real()*psi.real() + psi.imag()*psi.imag();
-        }
-        intensity /= ninputprop;
-        iavg(ipoint, 0) += intensity;
-        // Warning: this formula does not take into account multiple input leads.
-    }
-}
-
-/**
- * Compute the intensity corresponding to the given input mode "imode", and add it to the given data matrix.
- * The intensity is normalized to get unit incident intensity.
- */
-void WaveSystem::addIMode(RealMatrix& iavg, const int imode) {
-    
-    // 1. First check for possible errors:
-    if (iavg.getNrow() != npoint || iavg.getNcol() != 1) {
-        std::string msg = "In addIMode(): Invalid size of 'iavg'. Received ("
-                        + std::to_string(iavg.getNrow()) + ", " + std::to_string(iavg.getNcol()) + "), expected ("
-                        + std::to_string(npoint) + ", 1).";
-        throw std::invalid_argument(msg);
-    }
-    else if (imode < 0 || imode >= ninputprop) {
-        std::string msg = "In addIMode(): Invalid mode index 'imode'. Received "
-                        + std::to_string(imode) + ", expected in 0.." + std::to_string(ninputprop-1) + ".";
-        throw std::invalid_argument(msg);
-    }
-    
-    computeGreenFunction(); // Ensure that the Green function is computed.
-    
-    // Add the mode-averaged intensity:
-    dcomplex psi;
-    for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points of the mesh.
-        psi = green(ipoint, imode) * 2.*I*std::sqrt(ninput) * inputKlh(imode, 0).real();
-        iavg(ipoint, 0) += psi.real()*psi.real() + psi.imag()*psi.imag();
-        // Warning: this formula does not take into account multiple input leads.
-    }
-}
-
-/**
  * Compute the transmission eigenstates and their associated transmission eigenvalues.
  * 
  * Arguments:
@@ -1001,7 +938,6 @@ void WaveSystem::addITransmission(const RealMatrix& trange, RealMatrix& tprofile
     svd(tmat, tval, u, vh);  // Perform the SVD. t = U S V^H  -->  t^H t = V S^2 V^H. 
     // NB: Each row of V^H is the conjugate of a transmission eigenstate (in modal representation). vh(ival, imode)
     
-    //double a;
     for (int ival = 0; ival < ntval; ival++) {// Loop on the singular values.
         tval(ival, 0) = tval(ival, 0)*tval(ival, 0);  // Compute the transmission eigenvalues from the singular values.
     }
@@ -1037,5 +973,197 @@ void WaveSystem::addITransmission(const RealMatrix& trange, RealMatrix& tprofile
                 nsample(iprofile, 0) += 1;  // Increments the number of found profiles.
             }
         }
+    }
+}
+
+/**
+ * Compute the intensity profile of the highest transmission eigenstate for a single realization of the disorder and add it to the matrix "itmax".
+ * 
+ * Arguments:
+ * 
+ * itmax  = On output, the intensity profile of the highest transmission eigenstate is added to the "itmax" vector.
+ * tmax   = On output, the maximum transmission eigenvalue.
+ */
+void WaveSystem::addITmax(RealMatrix& itmax, double& tmax) {
+    
+    // 1. First check for possible errors:
+    if (itmax.getNrow() != npoint || itmax.getNcol() != 1) {
+        std::string msg = "In addITmax(): Invalid size of 'itmax'. Received ("
+                        + std::to_string(itmax.getNrow()) + ", " + std::to_string(itmax.getNcol()) + "), expected ("
+                        + std::to_string(npoint) + ", 1).";
+        throw std::invalid_argument(msg);
+    }
+    
+    // 2. Compute the singular value decomposition of the transmission matrix:
+    const int istate = 0; // The desired transmission eigenstate is the highest one.
+    RealMatrix s(std::min(ninputprop, noutputprop), 1); // Singular values of the transmission matrix.
+    ComplexMatrix tmat(noutputprop, ninputprop), u(noutputprop, noutputprop), vh(ninputprop, ninputprop);
+    transmissionMatrix(tmat);  // We only need the transmission matrix, not the reflection matrix.
+    svd(tmat, s, u, vh);  // Perform the SVD. t = U S V^H  -->  t^H t = V S^2 V^H. 
+    // NB: Each row of V^H is the conjugate of a transmission eigenstate (in modal representation). vh(ival, imode)
+    tmax = s(istate, 0)*s(istate, 0); // The highest transmission eigenvalue is the square of the highest singular value.
+    
+    dcomplex psi;
+    const dcomplex ampli = 2.*I*std::sqrt(ninputprop/(2*PI*doslattice)); // Normalization of transmission eigenstates such that the incident intensity is 1.
+    
+    // Compute the square modulus of the transmission state:
+    for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points of the mesh.
+        
+        // Compute the transmission eigenstate associated to "t":
+        psi = 0.;
+        for (int imode = 0; imode < ninputprop; imode++) {// Loop over the input modes to construct the transmission eigenstate at "ipoint".
+            psi += green(ipoint, imode) * std::conj(vh(istate, imode)) * std::sqrt(inputKlh(imode, 0).real()) * ampli;
+        }
+        itmax(ipoint, 0) += psi.real()*psi.real() + psi.imag()*psi.imag();
+        // Warning: this formula does not take into account multiple input leads.
+    }
+}
+
+/**
+ * Compute the intensity corresponding to a isotropic mixture of all input modes, and add it to the given data matrix.
+ * The intensity is normalized to get unit incident intensity.
+ */
+void WaveSystem::addIIsotropic(RealMatrix& iavg) {
+    
+    // 1. First check for possible errors:
+    if (iavg.getNrow() != npoint || iavg.getNcol() != 1) {
+        std::string msg = "In addIIsotropic(): Invalid size of 'iavg'. Received ("
+                        + std::to_string(iavg.getNrow()) + ", " + std::to_string(iavg.getNcol()) + "), expected ("
+                        + std::to_string(npoint) + ", 1).";
+        throw std::invalid_argument(msg);
+    }
+    
+    computeGreenFunction(); // Ensure that the Green function is computed.
+    
+    // Add the mode-averaged intensity:
+    double intensity;
+    dcomplex psi;
+    for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points of the mesh.
+        
+        // Compute the mode-averaged intensity at the current position:
+        intensity = 0.;
+        for (int imode = 0; imode < ninputprop; imode++) {// Loop over the input modes to construct the transmission eigenstate at "ipoint".
+            psi = green(ipoint, imode) * I*std::sqrt(2.*ninputprop/(PI*dosinput)) * std::sqrt(inputKlh(imode, 0).real());
+            intensity += psi.real()*psi.real() + psi.imag()*psi.imag();
+        }
+        intensity /= ninputprop;
+        iavg(ipoint, 0) += intensity;
+        // Warning: this formula does not take into account multiple input leads.
+    }
+}
+
+/**
+ * Compute the intensity corresponding to the given input mode "imode", and add it to the given data matrix.
+ * The intensity is normalized to get unit incident intensity.
+ */
+void WaveSystem::addIMode(RealMatrix& iavg, const int imode) {
+    
+    // 1. First check for possible errors:
+    if (iavg.getNrow() != npoint || iavg.getNcol() != 1) {
+        std::string msg = "In addIMode(): Invalid size of 'iavg'. Received ("
+                        + std::to_string(iavg.getNrow()) + ", " + std::to_string(iavg.getNcol()) + "), expected ("
+                        + std::to_string(npoint) + ", 1).";
+        throw std::invalid_argument(msg);
+    }
+    else if (imode < 0 || imode >= ninputprop) {
+        std::string msg = "In addIMode(): Invalid mode index 'imode'. Received "
+                        + std::to_string(imode) + ", expected in 0.." + std::to_string(ninputprop-1) + ".";
+        throw std::invalid_argument(msg);
+    }
+    
+    computeGreenFunction(); // Ensure that the Green function is computed.
+    
+    // Add the mode-averaged intensity:
+    dcomplex psi;
+    for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points of the mesh.
+        psi = green(ipoint, imode) * 2.*I*std::sqrt(ninput) * inputKlh(imode, 0).real();
+        iavg(ipoint, 0) += psi.real()*psi.real() + psi.imag()*psi.imag();
+    }
+}
+
+/**
+ * Compute the intensity corresponding to an input plane wave, and add it to the given data matrix.
+ * The intensity is normalized to get unit incident intensity.
+ */
+void WaveSystem::addIPlane_v1(RealMatrix& iplane, double& tplane) {
+    
+    // 1. First check for possible errors:
+    if (iplane.getNrow() != npoint || iplane.getNcol() != 1) {
+        std::string msg = "In addIPlane(): Invalid size of 'iplane'. Received ("
+                        + std::to_string(iplane.getNrow()) + ", " + std::to_string(iplane.getNcol()) + "), expected ("
+                        + std::to_string(npoint) + ", 1).";
+        throw std::invalid_argument(msg);
+    }
+    
+    ComplexMatrix tmat(noutputprop, ninputprop), w(ninputprop, 1);
+    transmissionMatrix(tmat);  // We only need the transmission matrix, not the reflection matrix.
+    
+    dcomplex psi, ampli = 0.;
+    for (int imode = 0; imode < ninputprop; imode += 2) {// Loop over modes to compute the correct normalization factor.
+        ampli += 1./((imode + 1.)*(imode + 1.));
+        w(imode, 0) = std::sqrt(inputKlh(imode, 0).real())/(imode + 1.);
+    }
+    ampli = 2.*I*std::sqrt(static_cast<dcomplex>(ninput)/ampli); // Normalization such that the incident intensity is 1.
+    double s = (tmat * w).norm()/w.norm();
+    tplane = s*s; // Computes the transmission probability for a plane wave.
+    
+    for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points of the mesh.
+        
+        // Compute the transmission eigenstate associated to "t":
+        psi = 0.;
+        for (int imode = 0; imode < ninputprop; imode += 2) {// Loop over the input modes to construct an incident plane wave.
+            psi += green(ipoint, imode) * ampli * inputKlh(imode, 0).real()/(imode + 1.);
+        }
+        iplane(ipoint, 0) += psi.real()*psi.real() + psi.imag()*psi.imag();
+        // Warning: this formula does not take into account multiple input leads.
+    }
+}
+
+/**
+ * Compute the intensity corresponding to an input plane wave, and add it to the given data matrix.
+ * The intensity is normalized to get unit incident intensity.
+ * @deprecated For some reason this version leads to slightly different normalization (use addIPlane_v1() instead).
+ */
+void WaveSystem::addIPlane_v2(RealMatrix& iplane, double& tplane) {
+    
+    // 1. First check for possible errors:
+    if (iplane.getNrow() != npoint || iplane.getNcol() != 1) {
+        std::string msg = "In addIPlane(): Invalid size of 'iplane'. Received ("
+                        + std::to_string(iplane.getNrow()) + ", " + std::to_string(iplane.getNcol()) + "), expected ("
+                        + std::to_string(npoint) + ", 1).";
+        throw std::invalid_argument(msg);
+    }
+    
+    //2. Compute the normalization amplitude:
+    dcomplex ampli = 0., num = 0., denom = 0.;
+    for (int imode = 0; imode < ninputprop; imode += 2) {// Loop over modes to compute the correct normalization factor.
+        num += 1./((imode + 1)*(imode + 1));
+        denom += inputKlh(imode, 0).real()/((imode + 1)*(imode + 1));
+    }
+    ampli = 2.*I*std::sqrt(static_cast<dcomplex>(ninput)/(num/denom)); // Normalization such that the incident intensity is 1.
+    
+    // 3. Compute the vector state corresponding to an input plane wave, and transmission matrix:
+    ComplexMatrix psi(npoint, 1), tmat(noutputprop, ninputprop), w(ninputprop, 1), inputwave(ninputprop, 1);
+    transmissionMatrix(tmat);  // We only need the transmission matrix, not the reflection matrix.
+    for (int imode = 0; imode < ninputprop; imode++) {// Define the input state corresponding to a plane wave (note that it is in modal basis).
+        if (imode % 2 == 0) {// Even indices are nonzero (cf. Fourier coefficients of a constant).
+            w(imode, 0) = std::sqrt(inputKlh(imode, 0).real())/(imode + 1.);
+            inputwave(imode, 0) = ampli * inputKlh(imode, 0).real()/(imode + 1.);
+        }
+        else {
+            w(imode, 0) = 0.;
+            inputwave(imode, 0) = 0.;
+        }
+        // Warning: this formula does not take into account multiple input leads.
+    }
+    w = w/w.norm();
+    double s = (tmat * w).norm();
+    tplane = s*s; // Computes the transmission probability for a plane wave.
+    
+    // 4. Compute the wavefunction corresponding to an imput plane wave:
+    psi = green * inputwave; // Compute the wavefunction 
+    
+    for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points of the mesh.
+        iplane(ipoint, 0) += psi(ipoint, 0).real()*psi(ipoint, 0).real() + psi(ipoint, 0).imag()*psi(ipoint, 0).imag();
     }
 }

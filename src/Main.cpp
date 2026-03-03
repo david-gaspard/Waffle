@@ -185,11 +185,11 @@ void plotITransmission(const RealMatrix& tprofile, const RealMatrix& trange, con
     estimateScatteringDepth(tvalstore, tavg, tuct, dscat_eff, dscat_uct);
     
     std::string info = "Transmission eigenstate profiles for Trange=[";
-    for (int iprofile = 0; iprofile < nprofile; iprofile++) {// Save the ranges of transmission eigenvalues for which 
+    for (int iprofile = 0; iprofile < nprofile; iprofile++) {// Save the ranges of transmission eigenvalues.
         info += " " + std::to_string(trange(iprofile, 0)) + "+-" + std::to_string(trange(iprofile, 1)) + " ";
     }
     info += "]\n%% Found Nsample=[";
-    for (int iprofile = 0; iprofile < nprofile; iprofile++) {// Save the ranges of transmission eigenvalues for which 
+    for (int iprofile = 0; iprofile < nprofile; iprofile++) {// Save the number of samples in each range.
         info += " " + std::to_string(static_cast<int>(nsample(iprofile, 0))) + " ";
     }
     info += "], Nseed=" + std::to_string(nseed) + ", Seed0=" + std::to_string(seed0) + ", Tavg=" + std::to_string(tavg) + "+-" + std::to_string(tuct)
@@ -506,7 +506,7 @@ void taskIModeOMP(WaveSystem& sys, const int imode, const int nseed, const int s
 /**
  * Compute all the field intensities and other instances in a single run using multithreading with OpenMP.
  */
-void taskIAllOMP(WaveSystem& sys, const RealMatrix& trange, const int imode, const int nseed, const int seed0, const int nthread) {
+void taskIAllOMP(const WaveSystem& sys, const RealMatrix& trange, const int imode, const int nseed, const int seed0, const int nthread) {
     
     const int npoint = sys.getNPoint();
     const int nprofile = trange.getNrow();  // Get the desired number of profiles.
@@ -575,6 +575,74 @@ void taskIAllOMP(WaveSystem& sys, const RealMatrix& trange, const int imode, con
     sys.plotIntensity(iavgmode, info, "iavg_mode");
 }
 
+/**
+ * Compute the profile of maximum transmisison ITmax(r) and the intensity profile correpsonding to input plane wave IPlane(r),
+ * both averaged over the same realizations of the disorder.
+ * The purpose of this function is to produce nice figures for publication, but not necessarily average over many configurations.
+ */
+void taskITmaxIPlaneOMP(const WaveSystem& sys, const int nseed, const int seed0, const int nthread) {
+    
+    const int npoint = sys.getNPoint();
+    RealMatrix itmax(npoint, 1), iplane(npoint, 1), tmax(nseed, 1), tplane(nseed, 1);
+    
+    int cjob = 0; // Current number of completed jobs (i.e., realizations of the disorder).
+    std::string info = "ITmax+IPlane, " + std::to_string(nthread) + " thr";
+    const auto start = std::chrono::steady_clock::now(); // Gets the current time.
+    
+    #pragma omp parallel num_threads(nthread)
+    {
+        WaveSystem sys_loc(sys); // Deep copy of the system on each thread (OMP private).
+        RealMatrix itmax_loc(itmax), iplane_loc(iplane); // Local data (OMP private).
+        
+        #pragma omp for schedule(dynamic)
+        for (int iseed = 0; iseed < nseed; iseed++) {// Loop over realizations of the disorder.
+            
+            sys_loc.setDisorder(seed0 + iseed);
+            sys_loc.addITmax(itmax_loc, tmax(iseed, 0));
+            sys_loc.addIPlane_v1(iplane_loc, tplane(iseed, 0));
+            
+            // Critical section to print the progress bar:
+            #pragma omp critical
+            {
+                cjob++;
+                printProgressBar(cjob, nseed, info, start);
+            }
+        }
+        
+        // Critical section to gather all data together:
+        #pragma omp critical
+        {
+            itmax += itmax_loc;
+            iplane += iplane_loc;
+        }
+    }
+    
+    // Normalize the disorder average:
+    for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points.
+        itmax(ipoint, 0) /= nseed;
+        iplane(ipoint, 0) /= nseed;
+    }
+    
+    // End progress bar and compute the total time (in seconds):
+    const double ctime = endProgressBar(start);
+    
+    info = "Intensity for the maximum transmission eigenstate with Nseed=" + std::to_string(nseed) + ", Seed0=" + std::to_string(seed0) 
+         + ", Computation_time=" + std::to_string(ctime) + " s, Nthread=" + std::to_string(nthread) + ".\n%% Tmax = [";
+    for (int iseed = 0; iseed < nseed; iseed++) {// Save the maximum transmission eigenvalues.
+        info += " " + std::to_string(tmax(iseed, 0)) + " ";
+    }
+    info += "], Tmax_avg=" + std::to_string(tmax.mean()) + ", Tmax_stddev=" + std::to_string(tmax.stddev()) + ".";
+    sys.plotIntensity(itmax, info, "itmax");
+    
+    info = "Intensity for an input plane wave with Nseed=" + std::to_string(nseed) + ", Seed0=" + std::to_string(seed0) 
+         + ", Computation_time=" + std::to_string(ctime) + " s, Nthread=" + std::to_string(nthread) + ".\n%% Tplane = [";
+    for (int iseed = 0; iseed < nseed; iseed++) {// Save the maximum transmission eigenvalues.
+        info += " " + std::to_string(tplane(iseed, 0)) + " ";
+    }
+    info += "], Tplane_avg=" + std::to_string(tplane.mean()) + ", Tplane_stddev=" + std::to_string(tplane.stddev()) + ".";
+    sys.plotIntensity(iplane, info, "iplane");
+}
+
 /***************************************************************************************************
  * MAIN FUNCTION OF THE PROGRAM
  ***************************************************************************************************/
@@ -620,7 +688,8 @@ int main(int argc, char** argv) {
     //SquareMesh mesh("model/year-2026_1762x578.png");
     //SquareMesh mesh("model/constriction-1c4_1000x1000.png");
     //SquareMesh mesh("model/guide-annular-reservoir-1_422x840.png");
-    SquareMesh mesh("model/guide-reservoir-2_842x1680.png");
+    SquareMesh mesh("model/guide-reservoir-2_422x840.png");
+    
     
     /**
      * TABLE of effective scattering thickness for 300x900 slab waveguides with kh=1 and holscat=dscat/300:
@@ -689,7 +758,7 @@ int main(int argc, char** argv) {
     const double holabso = dabso/420; // Value of h/labso.
     const double density = 1.;  // Density of scatterers per pixel, between 0 and 1. Recommended is 1.
     
-    const std::string sysname = "guide-reservoir-2_842x1680/kh_" + to_string_prec(kh, 6) + "/dscat_" + to_string_prec(dscat, 6);
+    const std::string sysname = "guide-reservoir-2_422x840/kh_" + to_string_prec(kh, 6) + "/dscat_" + to_string_prec(dscat, 6);
     
     WaveSystem sys(sysname, mesh, kh, density, holscat, holabso);
     
@@ -725,22 +794,22 @@ int main(int argc, char** argv) {
     ctx.sys.infoHamiltonian();
     
     // Checking operations:
-    ctx.sys.setDisorder(1);
+    //ctx.sys.setDisorder(1); // Uncomment this line to insert disorder inside the medium.
     //ctx.sys.plotMesh();
     //ctx.sys.plotMatrixHamiltonian();
     //ctx.sys.plotMatrixInputState();
     //ctx.sys.plotMatrixOutputState();
     //ctx.sys.plotGreenFunction();
-    ctx.sys.plotInputModes(3);
-    ctx.sys.plotTransmissionStates(3);
+    //ctx.sys.plotInputModes(3); // Compute the lowest waveguide modes.
+    //ctx.sys.plotTransmissionStates(3); // Compute the lowest transmission eigenstates.
     //ctx.sys.checkResidual();
     //ctx.sys.checkUnitarity(true);
     
-    //const int nseed = 5000;   // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
-    //const int seed0 = 1;     // First seed used to generate realizations of the disorder. Actual seed = [seed0, seed0 + 1, ..., seed0 + nseed - 1]. 
-    //                         // NB: Avoid seed0=0 for safety (some random generators are singular for seed=0).
-    //const int nthread = 10;  // Number of threads used in multithreading with OpenMP.
-    //const int imode = 0;     // Index of the mode in taskIMode*() and taskIAllOMP().
+    const int nseed = 20;    // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
+    const int seed0 = 1;     // First seed used to generate realizations of the disorder. Actual seed = [seed0, seed0 + 1, ..., seed0 + nseed - 1]. 
+                             // NB: Avoid seed0=0 for safety (some random generators are singular for seed=0).
+    const int nthread = 5;  // Number of threads used in multithreading with OpenMP.
+    const int imode = 0;     // Index of the mode in taskIMode*() and taskIAllOMP().
     
     //taskCheckUnitarityOMP(ctx.sys, nseed, seed0, nthread);
     //taskITransmissionSerial(ctx.sys, ctx.trange, nseed, seed0);
@@ -749,6 +818,7 @@ int main(int argc, char** argv) {
     //taskIIsotropicOMP(ctx.sys, nseed, seed0, nthread);
     //taskIModeOMP(ctx.sys, imode, nseed, seed0, nthread);
     //taskIAllOMP(ctx.sys, ctx.trange, imode, nseed, seed0, nthread);
+    taskITmaxIPlaneOMP(ctx.sys, nseed, seed0, nthread);
     
     return 0;
 }

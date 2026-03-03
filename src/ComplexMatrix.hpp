@@ -43,6 +43,7 @@ class ComplexMatrix {
     friend ComplexMatrix operator*(const dcomplex scalar, const ComplexMatrix& a);
     friend ComplexMatrix operator*(const ComplexMatrix& a, const dcomplex scalar);
     friend ComplexMatrix operator*(const ComplexMatrix& a, const ComplexMatrix& b);
+    friend ComplexMatrix operator/(const ComplexMatrix& a, const dcomplex scalar);
     friend ComplexMatrix diagmul(const ComplexMatrix& a, const ComplexMatrix& b);
     friend void solve(const ComplexMatrix& a, const ComplexMatrix& b, ComplexMatrix& x);
     friend void svd(const ComplexMatrix& a, RealMatrix& s, ComplexMatrix& u, ComplexMatrix& v);

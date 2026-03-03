@@ -262,6 +262,13 @@ ComplexMatrix operator*(const ComplexMatrix& a, const ComplexMatrix& b) {
 }
 
 /**
+ * Division of a matrix by a scalar.
+ */
+ComplexMatrix operator/(const ComplexMatrix& a, const dcomplex scalar) {
+    return (1./scalar)*a;
+}
+
+/**
  * Multiplication by a diagonal matrix.
  * If A is a column matrix (A.ncol=1), then interpret A as a diagonal matrix and compute C_ij = A_i B_ij , 
  * otherwise if B is a row matrix (B.nrow=1), then interpret B as a diagonal matrix and compute C_ij = A_ij B_j .

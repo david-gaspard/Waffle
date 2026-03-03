@@ -90,8 +90,11 @@ class WaveSystem {
     void checkUnitarity(const bool showtval);
     void checkResidual();
     void addITransmission(const RealMatrix& trange, RealMatrix& tprofile, RealMatrix& nsample, RealMatrix& tval);
+    void addITmax(RealMatrix& itmax, double& tmax);
     void addIIsotropic(RealMatrix& iavg);
     void addIMode(RealMatrix& iavg, const int imode);
+    void addIPlane_v1(RealMatrix& iplane, double& tplane);
+    void addIPlane_v2(RealMatrix& iplane, double& tplane);
     
     private:
     
