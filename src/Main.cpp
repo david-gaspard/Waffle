@@ -499,82 +499,6 @@ void taskIModeOMP(WaveSystem& sys, const int imode, const int nseed, const int s
     sys.plotIntensity(iavgmode, info, "iavg_mode");
 }
 
-/***************************************************************************************************
- * COMPUTATION OF ALL INSTANCES
- ***************************************************************************************************/
-
-/**
- * Compute all the field intensities and other instances in a single run using multithreading with OpenMP.
- */
-void taskIAllOMP(const WaveSystem& sys, const RealMatrix& trange, const int imode, const int nseed, const int seed0, const int nthread) {
-    
-    const int npoint = sys.getNPoint();
-    const int nprofile = trange.getNrow();  // Get the desired number of profiles.
-    const int ntval = std::min(sys.getNInputProp(), sys.getNOutputProp());  // Get the number of nonzero transmission eigenvalues (propagating modes).
-    RealMatrix tprofile(npoint, nprofile), nsample(nprofile, 1), tval(ntval, 1), tvalstore(nseed, ntval);
-    RealMatrix iavgiso(npoint, 1), iavgmode(npoint, 1);
-    
-    int cjob = 0; // Current number of completed jobs (i.e., realizations of the disorder).
-    std::string info = "Iall, " + std::to_string(nthread) + " thr";
-    const auto start = std::chrono::steady_clock::now(); // Gets the current time.
-    
-    #pragma omp parallel num_threads(nthread)
-    {
-        WaveSystem sys_loc(sys); // Deep copy of the system on each thread (OMP private).
-        RealMatrix tprofile_loc(tprofile), nsample_loc(nsample), tval_loc(tval); // Local data (OMP private).
-        RealMatrix iavgiso_loc(npoint, 1), iavgmode_loc(npoint, 1); // Local data (OMP private).
-        
-        #pragma omp for schedule(dynamic)
-        for (int iseed = 0; iseed < nseed; iseed++) {// Loop over realizations of the disorder.
-            
-            sys_loc.setDisorder(seed0 + iseed);
-            sys_loc.addITransmission(trange, tprofile_loc, nsample_loc, tval_loc);
-            sys_loc.addIIsotropic(iavgiso_loc);
-            sys_loc.addIMode(iavgmode_loc, imode);
-            
-            for (int ival = 0; ival < ntval; ival++) {// Save the nonzero transmission eigenvalues in the matrix tvalstore.
-                tvalstore(iseed, ival) = tval_loc(ival, 0); // Copy the transmission eigenvalues.
-            }
-            
-            // Critical section to print the progress bar:
-            #pragma omp critical
-            {
-                cjob++;
-                printProgressBar(cjob, nseed, info, start);
-            }
-        }
-        
-        // Critical section to gather all data together:
-        #pragma omp critical
-        {
-            tprofile += tprofile_loc;
-            nsample += nsample_loc;
-            iavgiso += iavgiso_loc;
-            iavgmode += iavgmode_loc;
-        }
-    }
-    
-    // Normalize the disorder average:
-    normalizeITransmission(tprofile, nsample);  // Normalize the averages of transmission eigenstate profiles.
-    for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points.
-        iavgiso(ipoint, 0) /= nseed;
-        iavgmode(ipoint, 0) /= nseed;
-    }
-    
-    // End progress bar and compute the total time (in seconds):
-    const double ctime = endProgressBar(start);
-    
-    // Save data to files and plot:
-    plotITransmission(tprofile, trange, nsample, tvalstore, sys, nseed, seed0, nthread, ctime);
-    plotHistogram(tvalstore, sys, nseed, seed0, nthread, ctime);
-    info = "Intensity for isotropic input with Nseed=" + std::to_string(nseed) + ", Seed0=" + std::to_string(seed0) 
-         + ", Computation_time=" + std::to_string(ctime) + " s, Nthread=" + std::to_string(nthread) + ".";
-    sys.plotIntensity(iavgiso, info, "iavg_iso");
-    info = "Intensity for plane input with Imode=" + std::to_string(imode) + ", Nseed=" + std::to_string(nseed) + ", Seed0=" + std::to_string(seed0) 
-         + ", Computation_time=" + std::to_string(ctime) + " s, Nthread=" + std::to_string(nthread) + ".";
-    sys.plotIntensity(iavgmode, info, "iavg_mode");
-}
-
 /**
  * Compute the profile of maximum transmisison ITmax(r) and the intensity profile correpsonding to input plane wave IPlane(r),
  * both averaged over the same realizations of the disorder.
@@ -633,6 +557,108 @@ void taskITmaxIPlaneOMP(const WaveSystem& sys, const int nseed, const int seed0,
     }
     info += "], Tmax_avg=" + std::to_string(tmax.mean()) + ", Tmax_stddev=" + std::to_string(tmax.stddev()) + ".";
     sys.plotIntensity(itmax, info, "itmax");
+    
+    info = "Intensity for an input plane wave with Nseed=" + std::to_string(nseed) + ", Seed0=" + std::to_string(seed0) 
+         + ", Computation_time=" + std::to_string(ctime) + " s, Nthread=" + std::to_string(nthread) + ".\n%% Tplane = [";
+    for (int iseed = 0; iseed < nseed; iseed++) {// Save the maximum transmission eigenvalues.
+        info += " " + std::to_string(tplane(iseed, 0)) + " ";
+    }
+    info += "], Tplane_avg=" + std::to_string(tplane.mean()) + ", Tplane_stddev=" + std::to_string(tplane.stddev()) + ".";
+    sys.plotIntensity(iplane, info, "iplane");
+}
+
+/***************************************************************************************************
+ * COMPUTATION OF ALL INSTANCES
+ ***************************************************************************************************/
+
+/**
+ * Compute all the field intensities and other instances in a single run using multithreading with OpenMP.
+ */
+void taskIAllOMP(const WaveSystem& sys, const RealMatrix& trange, const int imode, const int nseed, const int seed0, const int nthread) {
+    
+    const int npoint = sys.getNPoint();
+    const int nprofile = trange.getNrow();  // Get the desired number of profiles.
+    const int ntval = std::min(sys.getNInputProp(), sys.getNOutputProp());  // Get the number of nonzero transmission eigenvalues (propagating modes).
+    RealMatrix tprofile(npoint, nprofile), nsample(nprofile, 1), tval(ntval, 1), tvalstore(nseed, ntval);
+    RealMatrix iavgiso(npoint, 1), iavgmode(npoint, 1);
+    RealMatrix itmax(npoint, 1), iplane(npoint, 1), tmax(nseed, 1), tplane(nseed, 1);
+    
+    int cjob = 0; // Current number of completed jobs (i.e., realizations of the disorder).
+    std::string info = "Iall, " + std::to_string(nthread) + " thr";
+    const auto start = std::chrono::steady_clock::now(); // Gets the current time.
+    
+    #pragma omp parallel num_threads(nthread)
+    {
+        WaveSystem sys_loc(sys); // Deep copy of the system on each thread (OMP private).
+        RealMatrix tprofile_loc(tprofile), nsample_loc(nsample), tval_loc(tval); // Local data (OMP private).
+        RealMatrix iavgiso_loc(npoint, 1), iavgmode_loc(npoint, 1); // Local data (OMP private).
+        RealMatrix itmax_loc(itmax), iplane_loc(iplane); // Local data (OMP private).
+        
+        #pragma omp for schedule(dynamic)
+        for (int iseed = 0; iseed < nseed; iseed++) {// Loop over realizations of the disorder.
+            
+            sys_loc.setDisorder(seed0 + iseed);
+            sys_loc.addITransmission(trange, tprofile_loc, nsample_loc, tval_loc);
+            sys_loc.addITmax(itmax_loc, tmax(iseed, 0));
+            sys_loc.addIIsotropic(iavgiso_loc);
+            sys_loc.addIMode(iavgmode_loc, imode);
+            sys_loc.addIPlane_v1(iplane_loc, tplane(iseed, 0));
+            
+            for (int ival = 0; ival < ntval; ival++) {// Save the nonzero transmission eigenvalues in the matrix tvalstore.
+                tvalstore(iseed, ival) = tval_loc(ival, 0); // Copy the transmission eigenvalues.
+            }
+            
+            // Critical section to print the progress bar:
+            #pragma omp critical
+            {
+                cjob++;
+                printProgressBar(cjob, nseed, info, start);
+            }
+        }
+        
+        // Critical section to gather all data together:
+        #pragma omp critical
+        {
+            tprofile += tprofile_loc;
+            nsample += nsample_loc;
+            itmax += itmax_loc;
+            iavgiso += iavgiso_loc;
+            iavgmode += iavgmode_loc;
+            iplane += iplane_loc;
+        }
+    }
+    
+    // Normalize the disorder average:
+    normalizeITransmission(tprofile, nsample);  // Normalize the averages of transmission eigenstate profiles.
+    for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points.
+        itmax(ipoint, 0) /= nseed;
+        iavgiso(ipoint, 0) /= nseed;
+        iavgmode(ipoint, 0) /= nseed;
+        iplane(ipoint, 0) /= nseed;
+    }
+    
+    // End progress bar and compute the total time (in seconds):
+    const double ctime = endProgressBar(start);
+    
+    // Save data to files and plot:
+    plotITransmission(tprofile, trange, nsample, tvalstore, sys, nseed, seed0, nthread, ctime);
+    plotHistogram(tvalstore, sys, nseed, seed0, nthread, ctime);
+    
+    info = "Intensity for the maximum transmission eigenstate with Nseed=" + std::to_string(nseed) + ", Seed0=" + std::to_string(seed0) 
+         + ", Computation_time=" + std::to_string(ctime) + " s, Nthread=" + std::to_string(nthread) + ".\n%% Tmax = [";
+    for (int iseed = 0; iseed < nseed; iseed++) {// Save the maximum transmission eigenvalues.
+        info += " " + std::to_string(tmax(iseed, 0)) + " ";
+    }
+    info += "], Tmax_avg=" + std::to_string(tmax.mean()) + ", Tmax_stddev=" + std::to_string(tmax.stddev()) + ".";
+    sys.plotIntensity(itmax, info, "itmax");
+    
+    info = "Intensity for isotropic input with Nseed=" + std::to_string(nseed) + ", Seed0=" + std::to_string(seed0) 
+         + ", Computation_time=" + std::to_string(ctime) + " s, Nthread=" + std::to_string(nthread) + ".";
+    sys.plotIntensity(iavgiso, info, "iavg_iso");
+    
+    info = "Intensity for plane input with Imode=" + std::to_string(imode) + ", Nseed=" + std::to_string(nseed) + ", Seed0=" + std::to_string(seed0) 
+         + ", Computation_time=" + std::to_string(ctime) + " s, Nthread=" + std::to_string(nthread) + ".";
+    sys.plotIntensity(iavgmode, info, "iavg_mode");
     
     info = "Intensity for an input plane wave with Nseed=" + std::to_string(nseed) + ", Seed0=" + std::to_string(seed0) 
          + ", Computation_time=" + std::to_string(ctime) + " s, Nthread=" + std::to_string(nthread) + ".\n%% Tplane = [";
@@ -750,8 +776,8 @@ int main(int argc, char** argv) {
      * 16.27    20
      * 12.53    15
      */
-    const double dscat = 4.35;  // Scattering depth, L/lscat.
-    const double dabso = 0.05;  // Absorption depth, L/labso.
+    const double dscat = 12.55;  // Scattering depth, L/lscat.
+    const double dabso = 1.;  // Absorption depth, L/labso.
     
     const double kh = 1.;  // Wavenumber times the lattice step. Avoid kh=1 because creates resonances when ninput = 3*integer + 2.
     const double holscat = dscat/300; // Value of h/lscat.
@@ -805,7 +831,7 @@ int main(int argc, char** argv) {
     //ctx.sys.checkResidual();
     //ctx.sys.checkUnitarity(true);
     
-    const int nseed = 500;    // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
+    const int nseed = 1000;    // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
     const int seed0 = 1;     // First seed used to generate realizations of the disorder. Actual seed = [seed0, seed0 + 1, ..., seed0 + nseed - 1]. 
                              // NB: Avoid seed0=0 for safety (some random generators are singular for seed=0).
     const int nthread = 10;  // Number of threads used in multithreading with OpenMP.
