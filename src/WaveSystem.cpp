@@ -29,6 +29,7 @@ WaveSystem::WaveSystem(const std::string& sysname, const SquareMesh& mesh, const
         density(checkDensity(density)),
         holscat(checkScattering(holscat)),
         holabso(checkAbsorption(holabso)),
+        khc(complexWavenumber(kh, holabso)),
         npoint(mesh.getNPoint()),
         ninput(mesh.getNBoundary(BND_INPUT)),
         noutput(mesh.getNBoundary(BND_OUTPUT)),
@@ -92,6 +93,13 @@ double WaveSystem::checkScattering(const double holscat) const {
  */
 double WaveSystem::checkAbsorption(const double holabso) const {
     return holabso;
+}
+
+/**
+ * Returns the complex wavenumber khc = kh + I*(h/labso)/2.
+ */
+dcomplex WaveSystem::complexWavenumber(const double kh, const double holabso) const {
+    return (holabso == 0.) ? dcomplex(kh, MEPS) : dcomplex(kh, holabso/2.);
 }
 
 /***********************************************************
@@ -438,7 +446,7 @@ void WaveSystem::computeHamiltonian() {
     std::cout << TAG_INFO << "Building the Hamiltonian... ";
     const auto start_build = std::chrono::steady_clock::now(); // Gets the current time.
     
-    const dcomplex kh2 = dcomplex(kh*kh, MEPS);
+    const dcomplex kh2 = khc*khc;
     const std::vector<Opening> opening = mesh.getOpening(); // Extract the list of openings.
     Opening op;
     MeshPoint p;
@@ -516,7 +524,7 @@ void WaveSystem::setDisorder(const uint64_t seed) {
     
     computed = false;  // Each time the Hamiltonian is modified, the Green function is no more valid and must be computed again.
     double uh2;
-    dcomplex kh2 = dcomplex(kh*kh, MEPS);
+    dcomplex kh2 = khc*khc;
     
     // Standard deviation of the random potential uh2 = U(x, y) * h^2 approximately producing the scattering strength h/lscat : 
     const double sigma = std::sqrt(kh*holscat/(PI*doslattice*density));
@@ -611,7 +619,7 @@ void WaveSystem::computeIOStates() {
     const auto start_build = std::chrono::steady_clock::now(); // Gets the current time.
     
     // Construct the input/output modes :
-    const dcomplex kh2 = dcomplex(kh*kh, MEPS);
+    const dcomplex kh2 = khc*khc;
     dcomplex d2pkh2, klh;
     const double klhmin2 = KLHMIN*KLHMIN; // Minimum value of klh^2 for a mode to be considered as a propagating.
     int np;          // Number of points in the current opening.

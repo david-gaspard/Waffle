@@ -25,8 +25,7 @@ class WaveSystem {
     double density;    // Density of scattering pixels per unit pixel. Value between 0 and 1.
     double holscat;    // Lattice step divided by the scattering mean free path, h/lscat. Total length is not a well defined unit.
     double holabso;    // Lattice step divided by the absorption length, h/labso. Total length is not a well defined unit.
-    
-    // TODO: Maybe store the complex wavenumber "khc" defined by kh + I*(h/labso)/2 ??
+    dcomplex khc;      // Complex wavenumber times the lattice step, khc = kh + I*(h/labso)/2.
     
     int npoint;        // Total number of points in the "mesh".
     int ninput;        // Number of points in the input, also equal to the number of input modes.
@@ -103,6 +102,7 @@ class WaveSystem {
     double checkDensity(const double density) const;
     double checkScattering(const double holscat) const;
     double checkAbsorption(const double holabso) const;
+    dcomplex complexWavenumber(const double kh, const double holabso) const;
     
     // Private computational methods:
     void computeHamiltonian();

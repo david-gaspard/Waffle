@@ -652,7 +652,7 @@ int main(int argc, char** argv) {
     
     // Create the system from a PNG image:
     //SquareMesh mesh("model/waveguide_30x20.png");
-    //SquareMesh mesh("model/waveguide_302x300.png"); // Currently standard waveguide.
+    SquareMesh mesh("model/waveguide_302x300.png"); // Currently standard waveguide.
     //SquareMesh mesh("model/waveguide_602x600.png");
     //SquareMesh mesh("model/waveguide_1202x1200.png");
     //SquareMesh mesh("model/double-guide-abso-sym_642x384.png");
@@ -680,7 +680,7 @@ int main(int argc, char** argv) {
     //SquareMesh mesh("model/waveguide_502x500.png");
     //SquareMesh mesh("model/slab-remission_152x452.png");
     //SquareMesh mesh("model/slab-tm-ar3-div15-in45-out5_152x452.png");
-    //SquareMesh mesh("model/slab-tm-ar3-div15-in5-out5_302x902.png");  // Currently standard slab (for dscat_eff=20, dscat=16.40).
+    //SquareMesh mesh("model/slab-tm-ar3-div15-in45-out5_302x902.png");  // Currently standard slab (for dscat_eff=20, dscat=16.40).
     //SquareMesh mesh("model/slab-tm-ar3-div15-in9-out9_302x902.png");
     //SquareMesh mesh("model/shrinking-guide_602x1000.png");
     //SquareMesh mesh("model/random-cavity-4-leads-1_600x385.png");
@@ -688,8 +688,8 @@ int main(int argc, char** argv) {
     //SquareMesh mesh("model/year-2026_1762x578.png");
     //SquareMesh mesh("model/constriction-1c4_1000x1000.png");
     //SquareMesh mesh("model/guide-annular-reservoir-1_422x840.png");
-    SquareMesh mesh("model/guide-reservoir-2_422x840.png");
-    
+    //SquareMesh mesh("model/guide-reservoir-2_422x840.png");
+    //SquareMesh mesh("model/cavity-8-leads-1_942x440.png");
     
     /**
      * TABLE of effective scattering thickness for 300x900 slab waveguides with kh=1 and holscat=dscat/300:
@@ -750,15 +750,15 @@ int main(int argc, char** argv) {
      * 16.27    20
      * 12.53    15
      */
-    const double dscat = 15.;  // Scattering depth, L/lscat.
-    const double dabso = 0.;  // Absorption depth, L/labso.
+    const double dscat = 4.35;  // Scattering depth, L/lscat.
+    const double dabso = 0.05;  // Absorption depth, L/labso.
     
     const double kh = 1.;  // Wavenumber times the lattice step. Avoid kh=1 because creates resonances when ninput = 3*integer + 2.
-    const double holscat = dscat/420; // Value of h/lscat.
-    const double holabso = dabso/420; // Value of h/labso.
+    const double holscat = dscat/300; // Value of h/lscat.
+    const double holabso = dabso/300; // Value of h/labso.
     const double density = 1.;  // Density of scatterers per pixel, between 0 and 1. Recommended is 1.
     
-    const std::string sysname = "guide-reservoir-2_422x840/kh_" + to_string_prec(kh, 6) + "/dscat_" + to_string_prec(dscat, 6);
+    const std::string sysname = "waveguide_302x300/kh_" + to_string_prec(kh, 6) + "/dscat_" + to_string_prec(dscat, 6) + "/dabso_" + to_string_prec(dabso, 6);
     
     WaveSystem sys(sysname, mesh, kh, density, holscat, holabso);
     
@@ -805,10 +805,10 @@ int main(int argc, char** argv) {
     //ctx.sys.checkResidual();
     //ctx.sys.checkUnitarity(true);
     
-    const int nseed = 20;    // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
+    const int nseed = 500;    // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
     const int seed0 = 1;     // First seed used to generate realizations of the disorder. Actual seed = [seed0, seed0 + 1, ..., seed0 + nseed - 1]. 
                              // NB: Avoid seed0=0 for safety (some random generators are singular for seed=0).
-    const int nthread = 5;  // Number of threads used in multithreading with OpenMP.
+    const int nthread = 10;  // Number of threads used in multithreading with OpenMP.
     const int imode = 0;     // Index of the mode in taskIMode*() and taskIAllOMP().
     
     //taskCheckUnitarityOMP(ctx.sys, nseed, seed0, nthread);
@@ -817,8 +817,8 @@ int main(int argc, char** argv) {
     //taskIIsotropicSerial(ctx.sys, nseed, seed0);
     //taskIIsotropicOMP(ctx.sys, nseed, seed0, nthread);
     //taskIModeOMP(ctx.sys, imode, nseed, seed0, nthread);
-    //taskIAllOMP(ctx.sys, ctx.trange, imode, nseed, seed0, nthread);
-    taskITmaxIPlaneOMP(ctx.sys, nseed, seed0, nthread);
+    taskIAllOMP(ctx.sys, ctx.trange, imode, nseed, seed0, nthread);
+    //taskITmaxIPlaneOMP(ctx.sys, nseed, seed0, nthread);
     
     return 0;
 }

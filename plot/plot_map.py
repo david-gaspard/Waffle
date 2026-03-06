@@ -140,7 +140,9 @@ def array_to_tikz(array, xmin, xmax, ymin, ymax, vmin, vmax, unit_length, data, 
     #cmap = SUNSET_CMAP  ## Use custom 'sunset' colormap.
     cmap_color_list = [c for c in cmap_base.colors] ## Extract the colors to resample the colormap.
     cmap_nodes = np.linspace(0., 1., len(cmap_color_list))
-    cmap = mcol.LinearSegmentedColormap.from_list("turbo_resampled", list(zip(cmap_nodes, cmap_color_list)), N=1024)
+    nsample = 1024
+    ##nsample = 15
+    cmap = mcol.LinearSegmentedColormap.from_list("turbo_resampled", list(zip(cmap_nodes, cmap_color_list)), N=nsample)
     #mplt.imshow(array, cmap=cmap)  ## Show the plot in live (optional).
     #mplt.colorbar()
     #mplt.show()
