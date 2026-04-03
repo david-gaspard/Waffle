@@ -318,7 +318,6 @@ void WaveSystem::plotIntensity(const RealMatrix& intensity, const std::string& d
     ofs << "\n";
     
     MeshPoint p;
-    dcomplex psi;
     
     for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points of the mesh.
         
@@ -345,6 +344,78 @@ void WaveSystem::plotIntensity(const RealMatrix& intensity, const std::string& d
     //if (std::system(cmd.c_str())) {
     //    std::cout << TAG_WARN << "The plot script returned an error.\n";
     //}
+}
+
+/**
+ * Save the given fields to a CSV file and plot it using an external script.
+ */
+void WaveSystem::plotFields(const RealMatrix& fields, const std::vector<std::string>& labels, const std::string& description, const std::string& plotname) const {
+    
+    // 1. First check for possible errors:
+    const int nfields = fields.getNcol();
+    if (fields.getNrow() != npoint) {// First check for possible errors:
+        std::string msg = "In plotFields(): Invalid field matrix, received nrow=" + std::to_string(fields.getNrow()) 
+                        + ", expected nrow=" + std::to_string(npoint) + ".";
+        throw std::invalid_argument(msg);
+    }
+    else if (labels.size() != nfields) {
+        std::string msg = "In plotFields(): Invalid number of labels, received " + std::to_string(labels.size()) 
+                        + "labels, expected " + std::to_string(nfields) + ".";
+        throw std::invalid_argument(msg);
+    }
+    else if (description.empty()) {
+        throw std::invalid_argument("In plotFields(): Empty 'description'. Please provide a description of the plot.");
+    }
+    else if (plotname.empty()) {
+        throw std::invalid_argument("In plotFields(): Empty 'plotname'. Please provide a short folder name.");
+    }
+    
+    // 2. Define the output settings:
+    const char* sep = ", ";  // Separator used between entries of the CSV file.
+    const int prec = 16;     // Precision used in printing double precision values.
+    const std::string filename = uniqueFile(plotname, ".csv");
+    const double fsize = ( (prec+4.)*nfields + 3.*DIMENSION*(std::log10(npoint)+2.) ) * static_cast<double>(npoint);  // Roughly estimated file size in bytes (octets).
+    std::cout << TAG_INFO << "Save intensity to file '" << filename << "', size ~" << (fsize/1e6) << " Mo...\n";
+    
+    // 3. Write the header:
+    std::ofstream ofs(filename); // Open the output file.
+    ofs << std::setprecision(prec); // Set the printing precision.
+    writeTimestamp(ofs, "%% "); // Apply a timestamp at the beginning.
+    
+    for (const std::string& line : summary()) {// Write the summary to the file header.
+        ofs << "%% " << line << "\n";
+    }
+    ofs << "%% plotname='" + plotname + "'\n%% Info: " << description << "\n"
+        << "x" << sep << "y" << sep << "north" << sep << "south" << sep << "east" << sep << "west";
+    
+    for (int ifield = 0; ifield < nfields; ifield++) {// Loop over the input modes to finish the column names.
+        ofs << sep << labels.at(ifield);
+    }
+    ofs << "\n";
+    
+    // 4. Write the data:
+    MeshPoint p;
+    
+    for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points of the mesh.
+        
+        p = mesh.getPoint(ipoint); // Extract the point to get its coordinates.
+        ofs << p.x << sep << p.y << sep
+            << boundaryTypeString(p.north) << sep << boundaryTypeString(p.south) << sep 
+            << boundaryTypeString(p.east)  << sep << boundaryTypeString(p.west);
+        
+        for (int ifield = 0; ifield < nfields; ifield++) {// Loop over the input modes.
+            ofs << sep << fields(ipoint, ifield); // Save the square modulus to the file.
+        }
+        ofs << "\n";
+    }
+    ofs.close();  // Close the stream before calling an external script (this may cause I/O trouble).
+    
+    // 5. Plot the data by calling an external script:
+    std::string cmd = "plot/plot_map.py lin " + labels.at(0) + " " + std::to_string(holscat) +  " auto " + filename;
+    std::cout << TAG_EXEC << cmd << "\n";
+    if (std::system(cmd.c_str())) {
+        std::cout << TAG_WARN << "The plot script returned an error.\n";
+    }
 }
 
 /**
@@ -918,7 +989,7 @@ void WaveSystem::addITransmission(const RealMatrix& trange, RealMatrix& tprofile
     const int nprofile = trange.getNrow();
     const int ntval = std::min(ninputprop, noutputprop);
     if (trange.getNcol() != 2) {
-        throw std::invalid_argument("In addITransmission(): Invalid size of 'trange', expected 2 columns for Tmin and Tmax.");
+        throw std::invalid_argument("In addITransmission(): Invalid size of 'trange', expected 2 columns for Tm and dT.");
     }
     else if (tprofile.getNrow() != npoint || tprofile.getNcol() != nprofile) {
         std::string msg = "In addITransmission(): Invalid size of 'tprofile'. Received ("
@@ -1174,4 +1245,120 @@ void WaveSystem::addIPlane_v2(RealMatrix& iplane, double& tplane) {
     for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points of the mesh.
         iplane(ipoint, 0) += psi(ipoint, 0).real()*psi(ipoint, 0).real() + psi(ipoint, 0).imag()*psi(ipoint, 0).imag();
     }
+}
+
+/**
+ * Computes the local current density (jx, jy) at point of index "ipoint" in the wave function "psi".
+ * This method implicitly assumes that "psi" lives on the internal mesh "mesh".
+ * 
+ * Jx = Im[Psi^H * D_x Psi]/k
+ * 
+ * Jx(x -> x+1)
+ * = Im[ (psi(x+1)^H + psi^H(x))/2 * (psi(x+1) - psi(x))/kh ]
+ * = Im[ psi^H(x)*psi(x+1) - psi(x+1)^H*psi(x) ]/2kh
+ * = Im[ psi^H(x)*psi(x+1) ]/kh
+ * 
+ * Jx(x-1 -> x)
+ * = Im[ psi^H(x-1)*psi(x) ]/kh
+ * 
+ * Jx(x-1 -> x+1)
+ * = Im[ psi^H(x)*psi(x+1) + psi^H(x-1)*psi(x) ]/2kh
+ * = Im[ psi^H(x)*psi(x+1) - psi^H(x)*psi(x-1) ]/2kh
+ * 
+ */
+void WaveSystem::currentAt(const ComplexMatrix& psi, const int istate, const int ipoint, double& jx, double& jy) const {
+    
+    // 1. First compute the four currents in the neighborhood of the point:
+    double jx_east = 0., jx_west = 0., jy_north = 0., jy_south = 0.;
+    const MeshPoint p = mesh.getPoint(ipoint);
+    const int ieast = p.east, iwest = p.west, inorth = p.north, isouth = p.south;
+    
+    // 2. Computes Jx, the horizontal component of the current:
+    if (ieast >= 0) {// If the east point belongs to the mesh:
+        jx_east = psi(ipoint, istate).real() * psi(ieast, istate).imag() - psi(ipoint, istate).imag() * psi(ieast, istate).real();
+    }
+    if (iwest >= 0) {// If the west point belongs to the mesh:
+        jx_west = psi(iwest, istate).real() * psi(ipoint, istate).imag() - psi(iwest, istate).imag() * psi(ipoint, istate).real();
+    }
+    jx = jx_west + jx_east;
+    if (ieast >= 0 and iwest >= 0) {// If both belong to the mesh, then take the average.
+        jx /= 2.;
+    }
+    
+    // 3. Computes Jy, the vertical component of the current:
+    if (inorth >= 0) {// If the north point belongs to the mesh:
+        jy_north = psi(ipoint, istate).real() * psi(inorth, istate).imag() - psi(ipoint, istate).imag() * psi(inorth, istate).real();
+    }
+    if (isouth >= 0) {// If the south point belongs to the mesh:
+        jy_south = psi(isouth, istate).real() * psi(ipoint, istate).imag() - psi(isouth, istate).imag() * psi(ipoint, istate).real();
+    }
+    jy = jy_north + jy_south;
+    if (inorth >= 0 and isouth >= 0) {// If both belong to the mesh, then take the average.
+        jy /= 2.;
+    }
+    
+}
+
+/**
+ * Computes the local current densities corresponding to the desired transmission eigenstates (prescribed by "trange") and add them
+ * to "tcurrent".
+ * 
+ * Arguments:
+ * 
+ * trange   = Selected ranges of transmission eigenvalues, [Tm-dT, Tm+dT], for which the transmission eigenchannels are desired. Size: (nprofile, 2).
+ *            The first column contains the value of the centers of intervals, Tm, and the second column the half-width of the intervals, dT.
+ * tcurrent = On output, current density of selected transmission eigenstates. Size: (npoint, 2*nprofile).
+ *            Note that, if multiple transmission eigenstates are found in an interval [Tm-dT, Tm+dT], then they are summed up.
+ *            If, on the contrary, no eigenstate is found, then the columns of "tcurrent" is set to zero.
+ *            This method adds the current directly to "tcurrent", so this matrix must be initialized to zero.
+ * nsample  = On output, number of found transmission eigenstates in the prescribed intervals. Size: (nprofile, 1).
+ *            This method increments the number of found transmission eigenstates, so "nsample" must be initialized to zero.
+ */
+void WaveSystem::addJTransmission(const RealMatrix& trange, RealMatrix& tcurrent, RealMatrix& nsample) {
+    
+    // 1. First check for possible errors:
+    const int nrange = trange.getNrow();
+    const int ntval = std::min(ninputprop, noutputprop);
+    if (trange.getNcol() != 2) {
+        throw std::invalid_argument("In addJTransmission(): Invalid size of 'trange', expected 2 columns for Tm and dT.");
+    }
+    else if (tcurrent.getNrow() != npoint || tcurrent.getNcol() != 2*nrange) {
+        std::string msg = "In addJTransmission(): Invalid size of 'tcurrent'. Received ("
+                        + std::to_string(tcurrent.getNrow()) + ", " + std::to_string(tcurrent.getNcol()) + "), expected ("
+                        + std::to_string(npoint) + ", " + std::to_string(2*nrange) + ").";
+        throw std::invalid_argument(msg);
+    }
+    else if (nsample.getNrow() != nrange || nsample.getNcol() != 1) {
+        std::string msg = "In addJTransmission(): Invalid size of 'nsample'. Received ("
+                        + std::to_string(nsample.getNrow()) + ", " + std::to_string(nsample.getNcol()) + "), expected ("
+                        + std::to_string(nrange) + ", 1).";
+        throw std::invalid_argument(msg);
+    }
+    
+    // 2. Compute all the transmission eigenstates:
+    double t, jx, jy; // Transmission eigenvalue.
+    ComplexMatrix tstate(npoint, ntval);
+    RealMatrix tval(ntval, 1);
+    computeTransmissionStates(tstate, tval);
+    
+    // 3. Add the current density to "tcurrent":
+    for (int ival = 0; ival < ntval; ival++) {// Loop on the transmission eigenstates.
+        
+        t = tval(ival, 0);  // Extract the current transmission eigenvalue.
+        
+        for (int irange = 0; irange < nrange; irange++) {// Loop over the target ranges of transmission eigenvalues.
+        
+            if (std::abs(t - trange(irange, 0)) < trange(irange, 1)) {// If "t" is in the interval [Tmin, Tmax], then add the profile.
+                
+                for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points to compute the current.
+                    currentAt(tstate, ival, ipoint, jx, jy);
+                    tcurrent(ipoint, 2*irange  ) += jx;
+                    tcurrent(ipoint, 2*irange+1) += jy;
+                }
+                nsample(irange, 0) += 1;  // Increments the number of found states.
+                
+            }
+        }
+    }
+    
 }

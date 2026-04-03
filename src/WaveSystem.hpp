@@ -17,9 +17,9 @@ class WaveSystem {
     
     private:
     
-    std::string sysname;  // String containing the name of the system (typically describing the system geometry) which is used to generate file output.
+    const std::string sysname;  // String containing the name of the system (typically describing the system geometry) which is used to generate file output.
     
-    SquareMesh mesh;   // Square mesh object.
+    const SquareMesh mesh;   // Square mesh object.
     
     double kh;         // Wavenumber times the lattice step, 2*pi*h/lambda. Also the phase accumulated across a lattice step (in radian).
     double density;    // Density of scattering pixels per unit pixel. Value between 0 and 1.
@@ -78,6 +78,7 @@ class WaveSystem {
     void plotMatrixOutputState() const;
     void plotMesh() const;
     void plotIntensity(const RealMatrix& intensity, const std::string& description, const std::string& filename) const;
+    void plotFields(const RealMatrix& fields, const std::vector<std::string>& labels, const std::string& description, const std::string& plotname) const;
     void plotGreenFunction();
     void plotInputModes(const int nmode);
     void plotTransmissionStates(const int nstate);
@@ -94,6 +95,7 @@ class WaveSystem {
     void addIMode(RealMatrix& iavg, const int imode);
     void addIPlane_v1(RealMatrix& iplane, double& tplane);
     void addIPlane_v2(RealMatrix& iplane, double& tplane);
+    void addJTransmission(const RealMatrix& trange, RealMatrix& tcurrent, RealMatrix& nsample);
     
     private:
     
@@ -111,6 +113,7 @@ class WaveSystem {
     void computeIOStates();
     void computeGreenFunction();
     void computeTransmissionStates(ComplexMatrix& tstate, RealMatrix& tval);
+    void currentAt(const ComplexMatrix& psi, const int istate, const int ipoint, double& jx, double& jy) const;
     
 };
 

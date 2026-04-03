@@ -39,7 +39,7 @@ int MeshPoint::neighbor(const Direction dir) const {
         case DIR_WEST:
             return west;
         default:
-            return -1;  // All direction cannot be opened at the same time (or the mesh only contains 1 point).
+            return BND_MIRROR;  // Asking for neighbors in all directions makes no sense.
     }
 }
 
