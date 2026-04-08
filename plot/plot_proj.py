@@ -79,7 +79,7 @@ x, {column_name}""".format(
     xlabel={{{xlabel}}},
     ylabel={{{ylabel}}},
     xmin={xmin}, xmax={xmax},
-    ymin=0,
+    %%ymin=0,
     %%ymode=log,
     unbounded coords=jump,  %% Discard NaN's and negative entries.
     clip marker paths=true, %% Clips the marks out of the axis frame.

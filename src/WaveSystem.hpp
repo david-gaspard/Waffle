@@ -96,6 +96,8 @@ class WaveSystem {
     void addIPlane_v1(RealMatrix& iplane, double& tplane);
     void addIPlane_v2(RealMatrix& iplane, double& tplane);
     void addJTransmission(const RealMatrix& trange, RealMatrix& tcurrent, RealMatrix& nsample);
+    void addPsiTransmission(const RealMatrix& trange, RealMatrix& tpsi, RealMatrix& nsample);
+    void addDevTransmission(const RealMatrix& trange, RealMatrix& tdev, RealMatrix& nsample);
     
     private:
     
@@ -114,6 +116,7 @@ class WaveSystem {
     void computeGreenFunction();
     void computeTransmissionStates(ComplexMatrix& tstate, RealMatrix& tval);
     void currentAt(const ComplexMatrix& psi, const int istate, const int ipoint, double& jx, double& jy) const;
+    void deviationAt(const ComplexMatrix& psi, const int istate, const int ipoint, double& devx, double& devy, double& intensity) const;
     
 };
 

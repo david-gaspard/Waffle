@@ -453,6 +453,154 @@ void taskJTransmissionOMP(const WaveSystem& sys, RealMatrix& trange, const int n
     sys.plotFields(tcurrent, labels, info, "jtstate");
 }
 
+/**
+ * Compute the field of transmission eigenstates averaged over the realizations of the disorder.
+ * Save the results to files with automated names, and call external plot scripts.
+ * This version uses multithreading with OpenMP to perform the averaging over the disorder.
+ */
+void taskPsiTransmissionOMP(const WaveSystem& sys, RealMatrix& trange, const int nseed, const int seed0, const int nthread) {
+    
+    const int npoint = sys.getNPoint();
+    const int nrange = trange.getNrow();  // Get the desired number of profiles.
+    RealMatrix tpsi(npoint, 2*nrange), nsample(nrange, 1);
+    
+    int cjob = 0; // Current number of completed jobs (i.e., realizations of the disorder).
+    const std::string msg = "Psi_tstate_avg, " + std::to_string(nthread) + " thr";
+    const auto start = std::chrono::steady_clock::now(); // Gets the current time.
+    
+    #pragma omp parallel num_threads(nthread)
+    {
+        WaveSystem sys_loc(sys); // Deep copy of the system on each thread (OMP private).
+        RealMatrix tpsi_loc(tpsi), nsample_loc(nsample); // Local data (OMP private).
+        
+        #pragma omp for schedule(dynamic)
+        for (int iseed = 0; iseed < nseed; iseed++) {// Loop over realizations of the disorder.
+            
+            sys_loc.setDisorder(seed0 + iseed); // Avoid seed=0 for safety.
+            sys_loc.addPsiTransmission(trange, tpsi_loc, nsample_loc);
+            
+            // Critical section to print the progress bar:
+            #pragma omp critical
+            {
+                cjob++;
+                printProgressBar(cjob, nseed, msg, start);
+            }
+        }
+        
+        // Critical section to gather all data together:
+        #pragma omp critical
+        {
+            tpsi += tpsi_loc;
+            nsample += nsample_loc;
+        }
+    }
+    
+    // Normalize the averages of transmission eigenstate profiles:
+    for (int irange = 0; irange < nrange; irange++) {// Loop over the transmission eigenstate profiles.
+        if (nsample(irange, 0) > MEPS) {// Only normalize the profile if the number of samples is nonzero.
+            for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points.
+                tpsi(ipoint, 2*irange  ) /= nsample(irange, 0);
+                tpsi(ipoint, 2*irange+1) /= nsample(irange, 0);
+            }
+        }
+    }
+    
+    // End progress bar and compute the total time (in seconds):
+    const double ctime = endProgressBar(start);
+    
+    // Save data to files and plot:
+    std::vector<std::string> labels;
+    std::string info = "Transmission eigenstates for Trange=[";
+    for (int irange = 0; irange < nrange; irange++) {// Save the ranges of transmission eigenvalues.
+        info += " " + std::to_string(trange(irange, 0)) + "+-" + std::to_string(trange(irange, 1)) + " ";
+    }
+    info += "]\n%% Found Nsample=[";
+    for (int irange = 0; irange < nrange; irange++) {// Save the number of samples in each range.
+        info += " " + std::to_string(static_cast<int>(nsample(irange, 0))) + " ";
+        labels.push_back("RePsi" + std::to_string(irange));
+        labels.push_back("ImPsi" + std::to_string(irange));
+    }
+    info += "], Nseed=" + std::to_string(nseed) + ", Seed0=" + std::to_string(seed0) 
+         + ", Computation_time=" + std::to_string(ctime) + " s, Nthread=" + std::to_string(nthread) + ".";
+    
+    sys.plotFields(tpsi, labels, info, "psitstate");
+}
+
+/**
+ * Compute the deviation field of transmission eigenstates averaged over the realizations of the disorder.
+ * Save the results to files with automated names, and call external plot scripts.
+ * This version uses multithreading with OpenMP to perform the averaging over the disorder.
+ */
+void taskDevTransmissionOMP(const WaveSystem& sys, RealMatrix& trange, const int nseed, const int seed0, const int nthread) {
+    
+    const int npoint = sys.getNPoint();
+    const int nrange = trange.getNrow();  // Get the desired number of profiles.
+    RealMatrix tdev(npoint, 3*nrange), nsample(nrange, 1);
+    
+    int cjob = 0; // Current number of completed jobs (i.e., realizations of the disorder).
+    const std::string msg = "Dev_tstate_avg, " + std::to_string(nthread) + " thr";
+    const auto start = std::chrono::steady_clock::now(); // Gets the current time.
+    
+    #pragma omp parallel num_threads(nthread)
+    {
+        WaveSystem sys_loc(sys); // Deep copy of the system on each thread (OMP private).
+        RealMatrix tdev_loc(tdev), nsample_loc(nsample); // Local data (OMP private).
+        
+        #pragma omp for schedule(dynamic)
+        for (int iseed = 0; iseed < nseed; iseed++) {// Loop over realizations of the disorder.
+            
+            sys_loc.setDisorder(seed0 + iseed); // Avoid seed=0 for safety.
+            sys_loc.addDevTransmission(trange, tdev_loc, nsample_loc);
+            
+            // Critical section to print the progress bar:
+            #pragma omp critical
+            {
+                cjob++;
+                printProgressBar(cjob, nseed, msg, start);
+            }
+        }
+        
+        // Critical section to gather all data together:
+        #pragma omp critical
+        {
+            tdev += tdev_loc;
+            nsample += nsample_loc;
+        }
+    }
+    
+    // Normalize the averages of transmission eigenstate profiles:
+    for (int irange = 0; irange < nrange; irange++) {// Loop over the transmission eigenstate profiles.
+        if (nsample(irange, 0) > MEPS) {// Only normalize the profile if the number of samples is nonzero.
+            for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points.
+                tdev(ipoint, 3*irange  ) /= nsample(irange, 0);
+                tdev(ipoint, 3*irange+1) /= nsample(irange, 0);
+                tdev(ipoint, 3*irange+2) /= nsample(irange, 0);
+            }
+        }
+    }
+    
+    // End progress bar and compute the total time (in seconds):
+    const double ctime = endProgressBar(start);
+    
+    // Save data to files and plot:
+    std::vector<std::string> labels;
+    std::string info = "Transmission eigenstates for Trange=[";
+    for (int irange = 0; irange < nrange; irange++) {// Save the ranges of transmission eigenvalues.
+        info += " " + std::to_string(trange(irange, 0)) + "+-" + std::to_string(trange(irange, 1)) + " ";
+        labels.push_back("Devx" + std::to_string(irange));
+        labels.push_back("Devy" + std::to_string(irange));
+        labels.push_back("I" + std::to_string(irange));
+    }
+    info += "]\n%% Found Nsample=[";
+    for (int irange = 0; irange < nrange; irange++) {// Save the number of samples in each range.
+        info += " " + std::to_string(static_cast<int>(nsample(irange, 0))) + " ";
+    }
+    info += "], Nseed=" + std::to_string(nseed) + ", Seed0=" + std::to_string(seed0) 
+         + ", Computation_time=" + std::to_string(ctime) + " s, Nthread=" + std::to_string(nthread) + ".";
+    
+    sys.plotFields(tdev, labels, info, "devtstate");
+}
+
 /***************************************************************************************************
  * COMPUTATION OF AVERAGED INTENSITY
  ***************************************************************************************************/
@@ -782,7 +930,8 @@ int main(int argc, char** argv) {
     //SquareMesh mesh("model/waveguide_1202x1200.png");
     //SquareMesh mesh("model/double-guide-abso-sym_642x384.png");
     //SquareMesh mesh("model/double-guide-abso-shift-15_642x384.png");
-    //SquareMesh mesh("model/maze_706x513.png");
+    //SquareMesh mesh("model/maze_abso_706x513.png");
+    //SquareMesh mesh("model/maze_lossless_706x512.png");
     //SquareMesh mesh("model/slab-transmission-1_299x893.png");
     //SquareMesh mesh("model/ring-guide_700x700.png");
     //SquareMesh mesh("model/arched-guide_1002x750.png");
@@ -815,6 +964,8 @@ int main(int argc, char** argv) {
     //SquareMesh mesh("model/guide-annular-reservoir-1_422x840.png");
     //SquareMesh mesh("model/guide-reservoir-2_422x840.png");
     //SquareMesh mesh("model/cavity-8-leads-1_942x440.png");
+    //SquareMesh mesh("model/fat-waveguide_322x300.png");
+    //SquareMesh mesh("model/slab-tm-ar3-div15-in21-out21_302x902.png");
     
     /**
      * TABLE of effective scattering thickness for 300x900 slab waveguides with kh=1 and holscat=dscat/300:
@@ -876,7 +1027,7 @@ int main(int argc, char** argv) {
      * 12.53    15
      */
     const double dscat = 12.55;  // Scattering depth, L/lscat.
-    const double dabso = 0.50;  // Absorption depth, L/labso.
+    const double dabso = 0.;  // Absorption depth, L/labso.
     
     const double kh = 1.;  // Wavenumber times the lattice step. Avoid kh=1 because creates resonances when ninput = 3*integer + 2.
     const double holscat = dscat/300; // Value of h/lscat.
@@ -887,11 +1038,11 @@ int main(int argc, char** argv) {
     
     WaveSystem sys(sysname, mesh, kh, density, holscat, holabso);
     
-    //RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    //trange(0, 0) = 0.998;  trange(0, 1) = 0.002;
-    //trange(1, 0) = 0.500;  trange(1, 1) = 0.01;
-    //trange(2, 0) = 0.100;  trange(2, 1) = 0.005;
-    //trange(3, 0) = 0.001;  trange(3, 1) = 0.00005;
+    RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
+    trange(0, 0) = 0.998;  trange(0, 1) = 0.002;
+    trange(1, 0) = 0.500;  trange(1, 1) = 0.01;
+    trange(2, 0) = 0.100;  trange(2, 1) = 0.005;
+    trange(3, 0) = 0.001;  trange(3, 1) = 0.00005;
     
     //RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
     //trange(0, 0) = 0.70;  trange(0, 1) = 0.02;
@@ -911,11 +1062,11 @@ int main(int argc, char** argv) {
     //trange(2, 0) = 0.29;  trange(2, 1) = 0.01;
     //trange(3, 0) = 0.27;  trange(3, 1) = 0.01;
     
-    RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    trange(0, 0) = 0.10;  trange(0, 1) = 0.005;
-    trange(1, 0) = 0.09;  trange(1, 1) = 0.005;
-    trange(2, 0) = 0.08;  trange(2, 1) = 0.005;
-    trange(3, 0) = 0.07;  trange(3, 1) = 0.005;
+    //RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
+    //trange(0, 0) = 0.10;  trange(0, 1) = 0.005;
+    //trange(1, 0) = 0.09;  trange(1, 1) = 0.005;
+    //trange(2, 0) = 0.08;  trange(2, 1) = 0.005;
+    //trange(3, 0) = 0.07;  trange(3, 1) = 0.005;
     
     //RealMatrix trange(5, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
     //trange(0, 0) = 0.50;  trange(0, 1) = 0.025;
@@ -944,11 +1095,11 @@ int main(int argc, char** argv) {
     //ctx.sys.plotMatrixOutputState();
     //ctx.sys.plotGreenFunction();
     //ctx.sys.plotInputModes(3); // Compute the lowest waveguide modes.
-    //ctx.sys.plotTransmissionStates(3); // Compute the lowest transmission eigenstates.
+    //ctx.sys.plotTransmissionStates(10); // Compute the lowest transmission eigenstates.
     //ctx.sys.checkResidual();
     //ctx.sys.checkUnitarity(true);
     
-    const int nseed = 100;   // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
+    const int nseed = 5000;  // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
     const int seed0 = 1;     // First seed used to generate realizations of the disorder. Actual seed = [seed0, seed0 + 1, ..., seed0 + nseed - 1]. 
                              // NB: Avoid seed0=0 for safety (some random generators are singular for seed=0).
     const int nthread = 10;  // Number of threads used in multithreading with OpenMP.
@@ -963,7 +1114,9 @@ int main(int argc, char** argv) {
     //taskITmaxIPlaneOMP(ctx.sys, nseed, seed0, nthread);
     //taskIAllOMP(ctx.sys, ctx.trange, imode, nseed, seed0, nthread);
     
-    taskJTransmissionOMP(ctx.sys, ctx.trange, nseed, seed0, nthread);
+    //taskJTransmissionOMP(ctx.sys, ctx.trange, nseed, seed0, nthread);
+    //taskPsiTransmissionOMP(ctx.sys, ctx.trange, nseed, seed0, nthread);
+    taskDevTransmissionOMP(ctx.sys, ctx.trange, nseed, seed0, nthread);
     
     return 0;
 }

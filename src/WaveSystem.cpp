@@ -653,7 +653,7 @@ int WaveSystem::computeNInputProp() const {
     }
     
     if (ninputprop == 0) {// Check for possible errors.
-        throw std::invalid_argument("In computeNInputProp(): The number of input progpating modes is zero. Please increase the number of points in the opening.");
+        throw std::invalid_argument("In computeNInputProp(): The number of input propagating modes is zero. Please increase the number of points in the opening.");
     }
     
     return ninputprop;
@@ -676,7 +676,7 @@ int WaveSystem::computeNOutputProp() const {
     }
     
     if (noutputprop == 0) {// Check for possible errors.
-        throw std::invalid_argument("In computeNInputProp(): The number of input progpating modes is zero. Please increase the number of points in the opening.");
+        throw std::invalid_argument("In computeNOutputProp(): The number of output propagating modes is zero. Please increase the number of points in the opening.");
     }
     
     return noutputprop;
@@ -1305,13 +1305,13 @@ void WaveSystem::currentAt(const ComplexMatrix& psi, const int istate, const int
  * 
  * Arguments:
  * 
- * trange   = Selected ranges of transmission eigenvalues, [Tm-dT, Tm+dT], for which the transmission eigenchannels are desired. Size: (nprofile, 2).
+ * trange   = Selected ranges of transmission eigenvalues, [Tm-dT, Tm+dT], for which the transmission eigenchannels are desired. Size: (nrange, 2).
  *            The first column contains the value of the centers of intervals, Tm, and the second column the half-width of the intervals, dT.
- * tcurrent = On output, current density of selected transmission eigenstates. Size: (npoint, 2*nprofile).
+ * tcurrent = On output, current density of selected transmission eigenstates. Size: (npoint, 2*nrange).
  *            Note that, if multiple transmission eigenstates are found in an interval [Tm-dT, Tm+dT], then they are summed up.
  *            If, on the contrary, no eigenstate is found, then the columns of "tcurrent" is set to zero.
  *            This method adds the current directly to "tcurrent", so this matrix must be initialized to zero.
- * nsample  = On output, number of found transmission eigenstates in the prescribed intervals. Size: (nprofile, 1).
+ * nsample  = On output, number of found transmission eigenstates in the prescribed intervals. Size: (nrange, 1).
  *            This method increments the number of found transmission eigenstates, so "nsample" must be initialized to zero.
  */
 void WaveSystem::addJTransmission(const RealMatrix& trange, RealMatrix& tcurrent, RealMatrix& nsample) {
@@ -1354,6 +1354,167 @@ void WaveSystem::addJTransmission(const RealMatrix& trange, RealMatrix& tcurrent
                     currentAt(tstate, ival, ipoint, jx, jy);
                     tcurrent(ipoint, 2*irange  ) += jx;
                     tcurrent(ipoint, 2*irange+1) += jy;
+                }
+                nsample(irange, 0) += 1;  // Increments the number of found states.
+                
+            }
+        }
+    }
+    
+}
+
+/**
+ * Computes the wavefunction corresponding to the desired transmission eigenstates (prescribed by "trange") and add them
+ * to "tpsi".
+ * 
+ * Arguments:
+ * 
+ * trange  = Selected ranges of transmission eigenvalues, [Tm-dT, Tm+dT], for which the transmission eigenchannels are desired. Size: (nrange, 2).
+ *           The first column contains the value of the centers of intervals, Tm, and the second column the half-width of the intervals, dT.
+ * tpsi    = On output, wavefunction of selected transmission eigenstates. Size: (npoint, 2*nrange).
+ *           Note that, if multiple transmission eigenstates are found in an interval [Tm-dT, Tm+dT], then they are summed up.
+ *           If, on the contrary, no eigenstate is found, then the columns of "tpsi" is set to zero.
+ *           This method adds the current directly to "tpsi", so this matrix must be initialized to zero.
+ * nsample = On output, number of found transmission eigenstates in the prescribed intervals. Size: (nrange, 1).
+ *           This method increments the number of found transmission eigenstates, so "nsample" must be initialized to zero.
+ */
+void WaveSystem::addPsiTransmission(const RealMatrix& trange, RealMatrix& tpsi, RealMatrix& nsample) {
+    
+    // 1. First check for possible errors:
+    const int nrange = trange.getNrow();
+    const int ntval = std::min(ninputprop, noutputprop);
+    if (trange.getNcol() != 2) {
+        throw std::invalid_argument("In addPsiTransmission(): Invalid size of 'trange', expected 2 columns for Tm and dT.");
+    }
+    else if (tpsi.getNrow() != npoint || tpsi.getNcol() != 2*nrange) {
+        std::string msg = "In addPsiTransmission(): Invalid size of 'tpsi'. Received ("
+                        + std::to_string(tpsi.getNrow()) + ", " + std::to_string(tpsi.getNcol()) + "), expected ("
+                        + std::to_string(npoint) + ", " + std::to_string(2*nrange) + ").";
+        throw std::invalid_argument(msg);
+    }
+    else if (nsample.getNrow() != nrange || nsample.getNcol() != 1) {
+        std::string msg = "In addPsiTransmission(): Invalid size of 'nsample'. Received ("
+                        + std::to_string(nsample.getNrow()) + ", " + std::to_string(nsample.getNcol()) + "), expected ("
+                        + std::to_string(nrange) + ", 1).";
+        throw std::invalid_argument(msg);
+    }
+    
+    // 2. Compute all the transmission eigenstates:
+    double t; // Transmission eigenvalue.
+    ComplexMatrix tstate(npoint, ntval);
+    RealMatrix tval(ntval, 1);
+    computeTransmissionStates(tstate, tval);
+    
+    // 3. Add the field to "tpsi":
+    for (int ival = 0; ival < ntval; ival++) {// Loop on the transmission eigenstates.
+        
+        t = tval(ival, 0);  // Extract the current transmission eigenvalue.
+        
+        for (int irange = 0; irange < nrange; irange++) {// Loop over the target ranges of transmission eigenvalues.
+        
+            if (std::abs(t - trange(irange, 0)) < trange(irange, 1)) {// If "t" is in the interval [Tmin, Tmax], then add the profile.
+                
+                for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points to compute the current.
+                    tpsi(ipoint, 2*irange  ) += tstate(ipoint, ival).real();
+                    tpsi(ipoint, 2*irange+1) += tstate(ipoint, ival).imag();
+                }
+                nsample(irange, 0) += 1;  // Increments the number of found states.
+                
+            }
+        }
+    }
+    
+}
+
+/**
+ * Computes the local deviation of the wavefunction "psi" of the state "istate" at point of index "ipoint".
+ * This method implicitly assumes that "psi" lives on the internal mesh "mesh".
+ * 
+ * The "deviation" is defined as the variance of the direction of propagation, and therefore measures
+ * the degree of deviation of the wave with respect to a plane wave.
+ * Formally, it is the integral over the momentum of the Wigner function weighted by the squared momentum:
+ * 
+ * dev_x(r) = int_p (p_x/k)^2 f(r,p) / k^2 
+ * = [|d_x psi(r)|^2 - Re[psi^H(r) d_x^2 psi(r)]]/(2k^2)
+ * 
+ * and similarly for dev_y(r).
+ */
+void WaveSystem::deviationAt(const ComplexMatrix& psi, const int istate, const int ipoint, double& devx, double& devy, double& intensity) const {
+    
+    const MeshPoint p = mesh.getPoint(ipoint);
+    const dcomplex psi_center = ipoint  >= 0 ? psi(ipoint,  istate) : 0.;
+    const dcomplex psi_east   = p.east  >= 0 ? psi(p.east,  istate) : 0.;
+    const dcomplex psi_west   = p.west  >= 0 ? psi(p.west,  istate) : 0.;
+    const dcomplex psi_north  = p.north >= 0 ? psi(p.north, istate) : 0.;
+    const dcomplex psi_south  = p.south >= 0 ? psi(p.south, istate) : 0.;
+    
+    const dcomplex dxpsi  = (psi_east - psi_west)/(2.*kh);
+    const dcomplex d2xpsi = (psi_east - 2.*psi_center + psi_west)/(kh*kh);
+    const dcomplex dypsi  = (psi_north - psi_south)/(2.*kh);
+    const dcomplex d2ypsi = (psi_north - 2.*psi_center + psi_south)/(kh*kh);
+    //const double abspsi2  = psi_center.real()*psi_center.real() + psi_center.imag()*psi_center.imag();
+    
+    devx = (dxpsi.real()*dxpsi.real() + dxpsi.imag()*dxpsi.imag() - (std::conj(psi_center) * d2xpsi).real())/2.;
+    devy = (dypsi.real()*dypsi.real() + dypsi.imag()*dypsi.imag() - (std::conj(psi_center) * d2ypsi).real())/2.;
+    intensity = psi_center.real()*psi_center.real() + psi_center.imag()*psi_center.imag();
+}
+
+/**
+ * Computes the deviation of the wavefunction corresponding to the desired transmission eigenstates (prescribed by "trange") and add them
+ * to "tdev".
+ * 
+ * Arguments:
+ * 
+ * trange  = Selected ranges of transmission eigenvalues, [Tm-dT, Tm+dT], for which the transmission eigenchannels are desired. Size: (nrange, 2).
+ *           The first column contains the value of the centers of intervals, Tm, and the second column the half-width of the intervals, dT.
+ * tdev    = On output, deviation field of transmission eigenstates. Size: (npoint, 2*nrange).
+ *           Note that, if multiple transmission eigenstates are found in an interval [Tm-dT, Tm+dT], then they are summed up.
+ *           If, on the contrary, no eigenstate is found, then the columns of "tpsi" is set to zero.
+ *           This method adds the current directly to "tdev", so this matrix must be initialized to zero.
+ * nsample = On output, number of found transmission eigenstates in the prescribed intervals. Size: (nrange, 1).
+ *           This method increments the number of found transmission eigenstates, so "nsample" must be initialized to zero.
+ */
+void WaveSystem::addDevTransmission(const RealMatrix& trange, RealMatrix& tdev, RealMatrix& nsample) {
+    
+    // 1. First check for possible errors:
+    const int nrange = trange.getNrow();
+    const int ntval = std::min(ninputprop, noutputprop);
+    if (trange.getNcol() != 2) {
+        throw std::invalid_argument("In addDevTransmission(): Invalid size of 'trange', expected 2 columns for Tm and dT.");
+    }
+    else if (tdev.getNrow() != npoint || tdev.getNcol() != 3*nrange) {
+        std::string msg = "In addDevTransmission(): Invalid size of 'tdev'. Received ("
+                        + std::to_string(tdev.getNrow()) + ", " + std::to_string(tdev.getNcol()) + "), expected ("
+                        + std::to_string(npoint) + ", " + std::to_string(3*nrange) + ").";
+        throw std::invalid_argument(msg);
+    }
+    else if (nsample.getNrow() != nrange || nsample.getNcol() != 1) {
+        std::string msg = "In addDevTransmission(): Invalid size of 'nsample'. Received ("
+                        + std::to_string(nsample.getNrow()) + ", " + std::to_string(nsample.getNcol()) + "), expected ("
+                        + std::to_string(nrange) + ", 1).";
+        throw std::invalid_argument(msg);
+    }
+    
+    // 2. Compute all the transmission eigenstates:
+    double t, devx, devy, intensity; // Transmission eigenvalue.
+    ComplexMatrix tstate(npoint, ntval);
+    RealMatrix tval(ntval, 1);
+    computeTransmissionStates(tstate, tval);
+    
+    // 3. Add the field to "tdev":
+    for (int ival = 0; ival < ntval; ival++) {// Loop on the transmission eigenstates.
+        
+        t = tval(ival, 0);  // Extract the current transmission eigenvalue.
+        
+        for (int irange = 0; irange < nrange; irange++) {// Loop over the target ranges of transmission eigenvalues.
+        
+            if (std::abs(t - trange(irange, 0)) < trange(irange, 1)) {// If "t" is in the interval [Tmin, Tmax], then add the profile.
+                
+                for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points to compute the current.
+                    deviationAt(tstate, ival, ipoint, devx, devy, intensity);
+                    tdev(ipoint, 3*irange  ) += devx;
+                    tdev(ipoint, 3*irange+1) += devy;
+                    tdev(ipoint, 3*irange+2) += intensity;
                 }
                 nsample(irange, 0) += 1;  // Increments the number of found states.
                 

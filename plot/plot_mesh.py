@@ -8,10 +8,52 @@ import sys, os, datetime, csv
 import numpy as np
 import compile_tikz as ct
 
-BOUNDARY_STYLE = """mirror/.style={black},
+BOUNDARY_STYLE_OLD = """mirror/.style={black},
     input/.style={red, decoration={markings, mark=between positions 0 and 1 step 1.3mm with {\\fill (-0.5mm, 1mm) -- (0mm, 0mm) -- (0.5mm, 1mm) --cycle;}, pre length=0.5mm, post length=0.5mm}, postaction={decorate}},
     output/.style={blue, decoration={markings, mark=between positions 0 and 1 step 1.3mm with {\\fill (-0.5mm, 0mm) -- (0mm, 1mm) -- (0.5mm, 0mm) --cycle;}, pre length=0.5mm, post length=0.5mm}, postaction={decorate}},
     open/.style={green!80!black, decoration={markings, mark=between positions 0 and 1 step 1.3mm with {\\fill (-0.5mm, 0mm) arc[start angle=180, end angle=0, radius=0.5mm] --cycle;}, pre length=0.5mm, post length=0.5mm}, postaction={decorate}}"""
+
+BOUNDARY_STYLE = """input/.style={%% #1=Spacing between arrows.
+        red,
+        thick,
+        decoration={%
+            transform={scale=0.8},
+            markings,
+            mark=between positions 0 and 1 step #1 with {%
+                \\fill (-0.7mm, 1.6mm) -- (0mm, 0.2mm) -- (0.7mm, 1.6mm) -| (0.2mm, 2.6mm) -| (-0.2mm, 1.6mm) --cycle;
+            },
+            pre length={#1/2},
+        },
+        postaction={decorate}
+    },
+    input/.default={3mm}, %% If no argument is given then this kicks in as argument.
+    output/.style={%% #1=Spacing between arrows.
+        blue,
+        thick,
+        decoration={%
+            transform={scale=0.8},
+            markings,
+            mark=between positions 0 and 1 step #1 with {%
+                \\fill (-0.2mm, 0mm) |- (-0.7mm, 1mm) -- (0mm, 2.4mm) -- (0.7mm, 1mm) -| (0.2mm, 0mm) --cycle;
+            },
+            pre length={#1/2},
+        },
+        postaction={decorate}
+    },
+    output/.default={3mm}, %% If no argument is given then this kicks in as argument.
+    mirror/.style={%
+        black,
+        thick,
+        decoration={%
+            transform={scale=0.8},
+            markings,
+            mark=between positions 0 and 1 step 0.7mm with {%
+                \\draw[thin] (0mm, 0mm) -- (0.5mm, 1mm);
+            },
+        },
+        postaction={decorate}
+    },
+    open/.style={draw=none}"""
 
 
 def point_equal(p1, p2):
