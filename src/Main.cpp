@@ -925,7 +925,7 @@ int main(int argc, char** argv) {
     
     // Create the system from a PNG image:
     //SquareMesh mesh("model/waveguide_30x20.png");
-    SquareMesh mesh("model/waveguide_302x300.png"); // Currently standard waveguide.
+    //SquareMesh mesh("model/waveguide_302x300.png"); // Currently standard waveguide.
     //SquareMesh mesh("model/waveguide_602x600.png");
     //SquareMesh mesh("model/waveguide_1202x1200.png");
     //SquareMesh mesh("model/double-guide-abso-sym_642x384.png");
@@ -966,6 +966,14 @@ int main(int argc, char** argv) {
     //SquareMesh mesh("model/cavity-8-leads-1_942x440.png");
     //SquareMesh mesh("model/fat-waveguide_322x300.png");
     //SquareMesh mesh("model/slab-tm-ar3-div15-in21-out21_302x902.png");
+    //SquareMesh mesh("model/guide-2-branch-e0_802x200.png");
+    //SquareMesh mesh("model/guide-2-branch-e1_802x400.png");
+    //SquareMesh mesh("model/guide-2-branch-e2_802x401.png");
+    //SquareMesh mesh("model/guide-2-branch-e3_802x401.png");
+    //SquareMesh mesh("model/guide-2-branch-e1_1202x600.png");
+    //SquareMesh mesh("model/guide-2-branch-e2_1202x601.png");
+    //SquareMesh mesh("model/guide-2-branch-e3_1202x601.png");
+    SquareMesh mesh("model/guide-bubbles-4_1002x500.png");
     
     /**
      * TABLE of effective scattering thickness for 300x900 slab waveguides with kh=1 and holscat=dscat/300:
@@ -1026,15 +1034,15 @@ int main(int argc, char** argv) {
      * 16.27    20
      * 12.53    15
      */
-    const double dscat = 12.55;  // Scattering depth, L/lscat.
+    const double dscat = 0.;  // Scattering depth, L/lscat.
     const double dabso = 0.;  // Absorption depth, L/labso.
     
     const double kh = 1.;  // Wavenumber times the lattice step. Avoid kh=1 because creates resonances when ninput = 3*integer + 2.
-    const double holscat = dscat/300; // Value of h/lscat.
-    const double holabso = dabso/300; // Value of h/labso.
+    const double holscat = dscat/1000; // Value of h/lscat.
+    const double holabso = dabso/1000; // Value of h/labso.
     const double density = 1.;  // Density of scatterers per pixel, between 0 and 1. Recommended is 1.
     
-    const std::string sysname = "waveguide_302x300/kh_" + to_string_prec(kh, 6) + "/dscat_" + to_string_prec(dscat, 6) + "/dabso_" + to_string_prec(dabso, 6);
+    const std::string sysname = "guide-bubbles-4_1002x500/kh_" + to_string_prec(kh, 6) + "/dscat_" + to_string_prec(dscat, 6) + "/dabso_" + to_string_prec(dabso, 6);
     
     WaveSystem sys(sysname, mesh, kh, density, holscat, holabso);
     
@@ -1094,15 +1102,15 @@ int main(int argc, char** argv) {
     //ctx.sys.plotMatrixInputState();
     //ctx.sys.plotMatrixOutputState();
     //ctx.sys.plotGreenFunction();
-    //ctx.sys.plotInputModes(3); // Compute the lowest waveguide modes.
-    //ctx.sys.plotTransmissionStates(10); // Compute the lowest transmission eigenstates.
+    ctx.sys.plotInputModes(20); // Compute the lowest waveguide modes.
+    ctx.sys.plotTransmissionStates(20); // Compute the lowest transmission eigenstates.
     //ctx.sys.checkResidual();
     //ctx.sys.checkUnitarity(true);
     
-    const int nseed = 5000;  // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
+    const int nseed = 1;  // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
     const int seed0 = 1;     // First seed used to generate realizations of the disorder. Actual seed = [seed0, seed0 + 1, ..., seed0 + nseed - 1]. 
                              // NB: Avoid seed0=0 for safety (some random generators are singular for seed=0).
-    const int nthread = 10;  // Number of threads used in multithreading with OpenMP.
+    const int nthread = 1;  // Number of threads used in multithreading with OpenMP.
     const int imode = 0;     // Index of the mode in taskIMode*() and taskIAllOMP().
     
     //taskCheckUnitarityOMP(ctx.sys, nseed, seed0, nthread);
@@ -1116,7 +1124,7 @@ int main(int argc, char** argv) {
     
     //taskJTransmissionOMP(ctx.sys, ctx.trange, nseed, seed0, nthread);
     //taskPsiTransmissionOMP(ctx.sys, ctx.trange, nseed, seed0, nthread);
-    taskDevTransmissionOMP(ctx.sys, ctx.trange, nseed, seed0, nthread);
+    //taskDevTransmissionOMP(ctx.sys, ctx.trange, nseed, seed0, nthread);
     
     return 0;
 }

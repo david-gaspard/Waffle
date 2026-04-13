@@ -51,23 +51,27 @@ SUNSET_COLORS = [[1.00000, 1.00000, 1.00000],
                  [0.01290, 0.00000, 0.16431],
                  [0.00313, 0.00000, 0.08248],
                  [0.00000, 0.00000, 0.00000]]
-SUNSET_NSAMPLE = len(SUNSET_COLORS)
-SUNSET_NODES = np.linspace(0., 1., SUNSET_NSAMPLE)
+SUNSET_NODES = np.linspace(0., 1., len(SUNSET_COLORS))
 SUNSET_CMAP = mcol.LinearSegmentedColormap.from_list("sunset_cmap", list(zip(SUNSET_NODES, SUNSET_COLORS)))
 SUNSET_CMAP = SUNSET_CMAP.reversed() ## Reverse the colormap in order to get larger is lighter.
                                      ## Note: Black on white is much more suitable for printing (since it reduces ink bleeding) and more efficient for reading (as reported by many studies) but, unfortunately, when it represents physical quantities it is less easy to interpret because white is generally associated with higher intensities.
 SUNSET_CMAP.set_bad('white', 0.) ## Set the color when nan is encountered. Args: (color, opacity).
 
-##cdict = {'red':   [(0.0, 1.0, 1.0),  # red decreases
-##                   (1.0, 0.0, 0.0)],
-##
-##         'green': [(0.0, 0.0, 0.0),  # green increases
-##                   (1.0, 1.0, 1.0)],
-##
-##         'blue':  [(0.0, 0.0, 0.0),  # no blue at all
-##                   (1.0, 0.0, 0.0)]}
-##
-##red_green_cm = LinearSegmentedColormap('RedGreen', cdict, N)
+## Create a red monochromatic colormap:
+REDMONO_COLORS = [(1., 1., 1.), (1., 0., 0.), (0., 0., 0.)]
+REDMONO_NODES = np.linspace(0., 1., len(REDMONO_COLORS))
+REDMONO_CMAP = mcol.LinearSegmentedColormap.from_list("redmono_cmap", list(zip(REDMONO_NODES, REDMONO_COLORS)))
+
+## Create a resampled "jet" colormap:
+JET_NSAMPLE = 1024
+JET_RESAMPLED_CMAP = mplt.get_cmap('jet', lut=JET_NSAMPLE)
+
+## Create a resampled "turbo" colormap:
+TURBO_COLORS = [c for c in mplt.cm.turbo.colors] ## Extract the colors to resample the colormap.
+TURBO_NODES = np.linspace(0., 1., len(TURBO_COLORS))
+TURBO_NSAMPLE = 1024
+##TURBO_NSAMPLE = 15
+TURBO_RESAMPLED_CMAP = mcol.LinearSegmentedColormap.from_list("turbo_resampled", list(zip(TURBO_NODES, TURBO_COLORS)), N=TURBO_NSAMPLE)
 
 
 def colormap_to_tikz_code(cmap, nsample, mode):
@@ -135,14 +139,11 @@ def array_to_tikz(array, xmin, xmax, ymin, ymax, vmin, vmax, unit_length, data, 
     Create a bitmap and a TikZ file importing this bitmap to plot the data.
     This function calls an external script to compile the TikZ file.
     """
-    cmap_base = mplt.cm.turbo  ## Use 'turbo' colormap (recommended).
-    #cmap = mplt.cm.jet ## Use 'jet' colormap.
     #cmap = SUNSET_CMAP  ## Use custom 'sunset' colormap.
-    cmap_color_list = [c for c in cmap_base.colors] ## Extract the colors to resample the colormap.
-    cmap_nodes = np.linspace(0., 1., len(cmap_color_list))
-    nsample = 1024
-    ##nsample = 15
-    cmap = mcol.LinearSegmentedColormap.from_list("turbo_resampled", list(zip(cmap_nodes, cmap_color_list)), N=nsample)
+    #cmap = REDMONO_CMAP  ## Red monochromatic colormap.
+    #cmap = JET_RESAMPLED_CMAP ## Use 'jet' colormap.
+    cmap = TURBO_RESAMPLED_CMAP ## Use 'turbo' colormap (recommended).
+    
     #mplt.imshow(array, cmap=cmap)  ## Show the plot in live (optional).
     #mplt.colorbar()
     #mplt.show()
