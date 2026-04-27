@@ -92,6 +92,10 @@ def colormap_to_tikz_code(cmap, nsample, mode):
     
     if (mode == "log"):
         string += ", colorbar style={yticklabel={$10^{\\pgfmathprintnumber[fixed relative, precision=3]{\\tick}}$}}"
+    elif (mode == "asinh"):
+        string += ", colorbar style={yticklabel={$\sinh(\\pgfmathprintnumber[fixed relative, precision=3]{\\tick})$}}"
+    elif (mode == "sqrt"):
+        string += ", colorbar style={yticklabel={$\\pgfmathprintnumber[fixed relative, precision=3]{\\tick}^2$}}"
     
     return string
 
@@ -231,8 +235,9 @@ def plot_map(args):
     file_path = os.path.splitext(field_file)[0] + "_" + column_name  ## The file path will be used to write new files.
     
     ## Check for possible invalid arguments:
-    if (mode != "lin" and mode != "log"):
-        print(ct.TAG_ERROR + "Invalid scale mode '" + mode + "', expected 'lin' or 'log', aborting...")
+    available_modes = ["lin", "log", "asinh", "sqrt"]
+    if (mode not in available_modes):
+        print(ct.TAG_ERROR + "Invalid scale mode '" + mode + "', expected in " + str(available_modes) + ", aborting...")
         return 1
     
     if (unit_length <= 0.):
@@ -243,6 +248,10 @@ def plot_map(args):
     
     if (mode == "log"):
         array = np.log10(array)
+    elif (mode == "asinh"):
+        array = np.arcsinh(array)
+    elif (mode == "sqrt"):
+        array = np.sqrt(array)
     
     ## Find the bounds (vmin, vmax) of the charted function:
     if (vrange == "auto"):
