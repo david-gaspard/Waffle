@@ -975,7 +975,16 @@ int main(int argc, char** argv) {
     //SquareMesh mesh("model/guide-2-branch-e3_1202x601.png");
     //SquareMesh mesh("model/guide-bubbles-4_1002x500.png");
     //SquareMesh mesh("model/thick_maze_1050x512.png");
-    SquareMesh mesh("model/slab-tm-ar3-div15-in15-out5_302x902.png");
+    //SquareMesh mesh("model/slab-tm-ar3-div15-in15-out5_302x902.png");
+    //SquareMesh mesh("model/waveguide-random-boundary-literal_1000x800.png");
+    //SquareMesh mesh("model/cavity-1_552x300.png");
+    //SquareMesh mesh("model/waveguide-size-input-50_302x300.png");
+    //SquareMesh mesh("model/waveguide-size-input-20_302x300.png");
+    //SquareMesh mesh("model/waveguide-size-inout-20_302x300.png");
+    //SquareMesh mesh("model/maze-tiny-1-calib_802x200.png"); // dscat=10.4 -> dscat_obs=12, dscat=6.97 -> dscat_obs=8, holscat=dscat/800.
+    SquareMesh mesh("model/maze-tiny-1_802x1201.png"); // dscat=10.4 -> dscat_obs=12, dscat=6.97 -> dscat_obs=8, holscat=dscat/800, nthread=4.
+    //SquareMesh mesh("model/maze-tiny-1-calib_402x100.png"); // dscat=6.75 -> dscat_obs=8, holscat=dscat/400, nthread=10.
+    //SquareMesh mesh("model/maze-tiny-1_402x601.png"); // dscat=6.75 -> dscat_obs=8, holscat=dscat/400, nthread=10.
     
     /**
      * TABLE of effective scattering thickness for 300x900 slab waveguides with kh=1 and holscat=dscat/300:
@@ -1036,29 +1045,32 @@ int main(int argc, char** argv) {
      * 16.27    20
      * 12.53    15
      */
-    const double dscat = 16.40;  // Scattering depth, L/lscat.
-    const double dabso = 0.;  // Absorption depth, L/labso.
+    const double dscat = 6.97;  // Scattering depth, L/lscat.
+    const double dabso = 0.;   // Absorption depth, L/labso.
     
     const double kh = 1.;  // Wavenumber times the lattice step. Avoid kh=1 because creates resonances when ninput = 3*integer + 2.
-    const double holscat = dscat/300; // Value of h/lscat.
-    const double holabso = dabso/300; // Value of h/labso.
+    const double holscat = dscat/800; // Value of h/lscat.
+    const double holabso = dabso/800; // Value of h/labso.
     const double density = 1.;  // Density of scatterers per pixel, between 0 and 1. Recommended is 1.
     
-    const std::string sysname = "slab-tm-ar3-div15-in15-out5_302x902/kh_" + to_string_prec(kh, 6) + "/dscat_" + to_string_prec(dscat, 6) + "/dabso_" + to_string_prec(dabso, 6);
+    const std::string sysname = "maze-tiny-1_802x1201/kh_" + to_string_prec(kh, 6) + "/dscat_" + to_string_prec(dscat, 6) + "/dabso_" + to_string_prec(dabso, 6);
     
     WaveSystem sys(sysname, mesh, kh, density, holscat, holabso);
     
-    RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    trange(0, 0) = 0.998;  trange(0, 1) = 0.002;
-    trange(1, 0) = 0.500;  trange(1, 1) = 0.01;
-    trange(2, 0) = 0.100;  trange(2, 1) = 0.005;
-    trange(3, 0) = 0.001;  trange(3, 1) = 0.00005;
-    
     //RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    //trange(0, 0) = 0.70;  trange(0, 1) = 0.02;
-    //trange(1, 0) = 0.66;  trange(1, 1) = 0.02;
-    //trange(2, 0) = 0.62;  trange(2, 1) = 0.02;
-    //trange(3, 0) = 0.58;  trange(3, 1) = 0.02;
+    //trange(0, 0) = 0.998;  trange(0, 1) = 0.002;
+    //trange(1, 0) = 0.500;  trange(1, 1) = 0.01;
+    //trange(2, 0) = 0.100;  trange(2, 1) = 0.005;
+    //trange(3, 0) = 0.001;  trange(3, 1) = 0.00005;
+    
+    RealMatrix trange(7, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
+    trange(0, 0) = 0.98;  trange(0, 1) = 0.02;
+    trange(1, 0) = 0.88;  trange(1, 1) = 0.02;
+    trange(2, 0) = 0.84;  trange(2, 1) = 0.02;
+    trange(3, 0) = 0.80;  trange(3, 1) = 0.02;
+    trange(4, 0) = 0.76;  trange(4, 1) = 0.02;
+    trange(5, 0) = 0.72;  trange(5, 1) = 0.02;
+    trange(6, 0) = 0.68;  trange(6, 1) = 0.02;
     
     //RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
     //trange(0, 0) = 0.53;  trange(0, 1) = 0.02;
@@ -1109,10 +1121,10 @@ int main(int argc, char** argv) {
     //ctx.sys.checkResidual();
     //ctx.sys.checkUnitarity(true);
     
-    const int nseed = 100;    // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
+    const int nseed = 500;   // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
     const int seed0 = 1;     // First seed used to generate realizations of the disorder. Actual seed = [seed0, seed0 + 1, ..., seed0 + nseed - 1]. 
                              // NB: Avoid seed0=0 for safety (some random generators are singular for seed=0).
-    const int nthread = 10;  // Number of threads used in multithreading with OpenMP.
+    const int nthread = 5;   // Number of threads used in multithreading with OpenMP.
     const int imode = 0;     // Index of the mode in taskIMode*() and taskIAllOMP().
     
     //taskCheckUnitarityOMP(ctx.sys, nseed, seed0, nthread);
@@ -1121,8 +1133,8 @@ int main(int argc, char** argv) {
     //taskIIsotropicSerial(ctx.sys, nseed, seed0);
     //taskIIsotropicOMP(ctx.sys, nseed, seed0, nthread);
     //taskIModeOMP(ctx.sys, imode, nseed, seed0, nthread);
-    taskITmaxIPlaneOMP(ctx.sys, nseed, seed0, nthread);
-    //taskIAllOMP(ctx.sys, ctx.trange, imode, nseed, seed0, nthread);
+    //taskITmaxIPlaneOMP(ctx.sys, nseed, seed0, nthread);
+    taskIAllOMP(ctx.sys, ctx.trange, imode, nseed, seed0, nthread);
     
     //taskJTransmissionOMP(ctx.sys, ctx.trange, nseed, seed0, nthread);
     //taskPsiTransmissionOMP(ctx.sys, ctx.trange, nseed, seed0, nthread);
