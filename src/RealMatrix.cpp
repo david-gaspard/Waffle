@@ -151,6 +151,83 @@ double RealMatrix::stddev() const {
 }
 
 /**
+ * Returns the sum of elements of the present matrix along the rows.
+ * The returned matrix is a row matrix of dimension (1, ncol).
+ */
+RealMatrix RealMatrix::sum_row() const {
+    
+    RealMatrix sum(1, ncol);
+    
+    for (int j = 0; j < ncol; j++) {// Loop over the columns.
+        sum.data[j] = 0.;  // Ensure the element is zero.
+        for (int i = 0; i < nrow; i++) {// Loop over the rows.
+            sum.data[j] += data[i + j*nrow];
+        }
+    }
+    
+    return sum;
+}
+
+/**
+ * Returns the sum of elements of the present matrix along the columns.
+ * The returned matrix is a column matrix of dimension (nrow, 1).
+ */
+RealMatrix RealMatrix::sum_col() const {
+    
+    RealMatrix sum(nrow, 1);
+    
+    for (int i = 0; i < nrow; i++) {// Loop over the rows.
+        sum.data[i] = 0.;  // Ensure the element is zero.
+        for (int j = 0; j < ncol; j++) {// Loop over the columns.
+            sum.data[i] += data[i + j*nrow];
+        }
+    }
+    
+    return sum;
+}
+
+/**
+ * Computes the mean of the elements of the present matrix along the columns.
+ * The returned matrix is a column matrix of dimension (nrow, 1).
+ */
+RealMatrix RealMatrix::mean_col() const {
+    
+    RealMatrix m(nrow, 1);
+    
+    for (int i = 0; i < nrow; i++) {// Loop over the rows.
+        m.data[i] = 0.;  // Ensure the element is zero.
+        for (int j = 0; j < ncol; j++) {// Loop over the columns.
+            m.data[i] += data[i + j*nrow];
+        }
+        m.data[i] /= ncol;  // Normalize the average.
+    }
+    
+    return m;
+}
+
+/**
+ * Computes the standard deviation of the elements of the present matrix along the columns.
+ * The returned matrix is a column matrix of dimension (nrow, 1).
+ */
+RealMatrix RealMatrix::stddev_col() const {
+    
+    RealMatrix s(nrow, 1);
+    const RealMatrix m = mean_col();
+    double delta;
+    
+    for (int i = 0; i < nrow; i++) {// Loop over the rows.
+        s.data[i] = 0.;  // Ensure the element is zero.
+        for (int j = 0; j < ncol; j++) {// Loop over the columns.
+            delta = data[i + j*nrow] - m.data[i];
+            s.data[i] += delta*delta;
+        }
+        s.data[i] = std::sqrt(s.data[i]/ncol);  // Normalize the average.
+    }
+    
+    return s;
+}
+
+/**
  * Returns the maximum value of all matrix elements of the present matrix.
  */
 double RealMatrix::max() const {
@@ -290,6 +367,25 @@ RealMatrix operator*(const RealMatrix& a, const RealMatrix& b) {
     dgemm_(trans, trans, a.nrow, b.ncol, a.ncol, alpha, a.data, a.nrow, b.data, b.nrow, beta, c.data, a.nrow);
     
     return c;
+}
+
+/**
+ * Division of a real matrix by a scalar divisor.
+ */
+RealMatrix operator/(const RealMatrix& a, const double scalar) {
+    
+    if (scalar == 0.) {
+        std::string msg = "In operator/(): Division by zero error.";
+        throw std::invalid_argument(msg);
+    }
+    
+    RealMatrix b(a.nrow, a.ncol);
+    
+    for (int l = 0; l < a.nrow*a.ncol; l++) {// Loop on the matrix elements.
+        b.data[l] = a.data[l]/scalar;
+    }
+    
+    return b;
 }
 
 /***************************************************************************************************

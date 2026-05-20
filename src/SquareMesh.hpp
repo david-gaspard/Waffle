@@ -46,11 +46,11 @@ class SquareMesh {
     ~SquareMesh();
     
     // Getters:
-    MeshPoint getPoint(const uint i) const;
-    uint getNPoint() const;
-    uint getNBoundary(const int bndtype) const;
+    MeshPoint getPoint(const int i) const;
+    int getNPoint() const;
+    int getNBoundary(const int bndtype) const;
     std::vector<Opening> getOpening() const;
-    uint getNOpening() const;
+    int getNOpening() const;
     
     // Determine the index of a given point:
     int indexOf(const int x, const int y) const;

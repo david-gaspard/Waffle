@@ -41,6 +41,10 @@ class RealMatrix {
     double sum() const;
     double mean() const;
     double stddev() const;
+    RealMatrix sum_row() const;
+    RealMatrix sum_col() const;
+    RealMatrix mean_col() const;
+    RealMatrix stddev_col() const;
     double max() const;
     double min() const;
     RealMatrix transpose() const;
@@ -50,6 +54,7 @@ class RealMatrix {
     friend RealMatrix operator*(const double scalar, const RealMatrix& a);
     friend RealMatrix operator*(const RealMatrix& a, const double scalar);
     friend RealMatrix operator*(const RealMatrix& a, const RealMatrix& b);
+    friend RealMatrix operator/(const RealMatrix& a, const double scalar);
     friend void svd(const ComplexMatrix& a, RealMatrix& s, ComplexMatrix& u, ComplexMatrix& v);
     
     // Print methods:

@@ -108,10 +108,10 @@ ComplexMatrix& ComplexMatrix::operator=(const ComplexMatrix& a) {
  ***************************************************************************************************/
 
 /**
- * Computes the Frobenius norm of the present matrix.
- * This is equivalent to the 2-norm for vectors.
+ * Computes the square of squares of all matrix elements of the present matrix.
+ * This is equivalent to compute the trace: Tr(A^+ * A).
  */
-double ComplexMatrix::norm() const {
+double ComplexMatrix::sumsquare() const {
     
     double re, im, sumsq = 0.;
     
@@ -121,7 +121,15 @@ double ComplexMatrix::norm() const {
         sumsq += re*re + im*im;
     }
     
-    return std::sqrt(sumsq);
+    return sumsq;
+}
+
+/**
+ * Computes the Frobenius norm of the present matrix.
+ * This is equivalent to the 2-norm for vectors.
+ */
+double ComplexMatrix::norm() const {
+    return std::sqrt(sumsquare());
 }
 
 /**

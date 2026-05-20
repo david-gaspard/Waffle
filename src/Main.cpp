@@ -142,32 +142,6 @@ void normalizeITransmission(RealMatrix& tprofile, const RealMatrix& nsample) {
     }
 }
 
-///**
-// * Normalize the disorder averages of transmission eigenstates profile contained in "tprofile" knowing the corresponding number of samples "nsample".
-// */
-//void normalizeJTransmission(RealMatrix& tcurrent, const RealMatrix& nsample) {
-//    
-//    // 1. Check for possible errors:
-//    const int npoint = tcurrent.getNrow();
-//    const int ncurrent = nsample.getNrow();
-//    if (tcurrent.getNcol() != 2*ncurrent || nsample.getNcol() != 1) {
-//        std::string msg = "In normalizeITransmission(): Invalid dimensions of tcurrent, received (" 
-//                        + std::to_string(tcurrent.getNrow()) + ", " + std::to_string(tcurrent.getNcol()) + "), expected (" 
-//                        + std::to_string(2*ncurrent) + ", 1).";
-//        throw std::invalid_argument(msg);
-//    }
-//    
-//    // 2. Compute the average profiles by dividing by the number of samples:
-//    for (int icur = 0; icur < ncurrent; icur++) {// Loop over the transmission eigenstate profiles.
-//        if (nsample(icur, 0) > MEPS) {// Only normalize the profile if the number of samples is nonzero.
-//            for (int ipoint = 0; ipoint < npoint; ipoint++) {// Loop over the points.
-//                tcurrent(ipoint, 2*icur  ) /= nsample(icur, 0);
-//                tcurrent(ipoint, 2*icur+1) /= nsample(icur, 0);
-//            }
-//        }
-//    }
-//}
-
 /**
  * Compute the average transmission probability (with uncertainty) and estimate the effective scattering thickness (with uncertainty)
  * under the assumption that the system has a waveguide geometry.
@@ -815,6 +789,100 @@ void taskITmaxIPlaneOMP(const WaveSystem& sys, const int nseed, const int seed0,
 }
 
 /***************************************************************************************************
+ * COMPUTATION OF TRANSMISSION BALANCE
+ ***************************************************************************************************/
+
+/**
+ * Compute the transmission probability in every opening for a large number of realizations of the disorder.
+ */
+void taskTBalanceOMP(const WaveSystem& sys, const int nseed, const int seed0, const int nthread) {
+    
+    const int nopening = sys.getNOpening();
+    RealMatrix alltavg(nopening, nseed);
+    
+    int cjob = 0; // Current number of completed jobs (i.e., realizations of the disorder).
+    std::string info = "TBalance, " + std::to_string(nthread) + " thr";
+    const auto start = std::chrono::steady_clock::now(); // Gets the current time.
+    
+    #pragma omp parallel num_threads(nthread)
+    {
+        WaveSystem sys_loc(sys); // Deep copy of the system on each thread (OMP private).
+        RealMatrix tavg_loc(nopening, 1); // Local data (OMP private).
+        
+        #pragma omp for schedule(dynamic)
+        for (int iseed = 0; iseed < nseed; iseed++) {// Loop over realizations of the disorder.
+            
+            sys_loc.setDisorder(seed0 + iseed);
+            sys_loc.transmissionBalance(tavg_loc);
+            
+            for (int iop = 0; iop < nopening; iop++) {// Copy the result in the global storage "alltavg".
+                alltavg(iop, iseed) = tavg_loc(iop, 0);
+                // Note that this is free from race condition because accessions are strictly separated.
+            }
+            
+            // Critical section to print the progress bar:
+            #pragma omp critical
+            {
+                cjob++;
+                printProgressBar(cjob, nseed, info, start);
+            }
+        }
+    }
+    
+    // End progress bar and compute the total time (in seconds):
+    const double ctime = endProgressBar(start);
+    
+    // Save the data:
+    const char* sep = ", ";  // Separator used between entries of the CSV file.
+    const int prec = 16;     // Precision used in printing double precision values.
+    const std::string dataname = "tbalance";  // Name of the saved data.
+    const std::string filename = sys.uniqueFile(dataname, ".csv");
+    std::cout << TAG_INFO << "Save transmission data to file '" << filename << "'...\n";
+    
+    std::ofstream ofs(filename); // Open the output file.
+    ofs << std::setprecision(prec); // Set the printing precision.
+    writeTimestamp(ofs, "%% "); // Apply a timestamp at the beginning.
+    
+    for (const std::string& line : sys.summary()) {// Write the summary to the file header.
+        ofs << "%% " << line << "\n";
+    }
+    ofs << "%% dataname='" + dataname + "'\n%% Average transmission probabilities observed in different openings for different realizations of the disorder.\n";
+    ofs << "%% Nseed=" + std::to_string(nseed) + ", Seed0=" + std::to_string(seed0) + ", Computation_time=" + std::to_string(ctime) + " s, Nthread=" + std::to_string(nthread) + "\nSeed";
+    
+    for (int iop = 0; iop < nopening; iop++) {// Loop over the openings.
+        ofs << sep << "Op" << iop;
+    }
+    ofs << sep << "Total\n";
+    
+    // Save the transmissions for each realization of the disorder:
+    const RealMatrix total_tavg = alltavg.sum_row(); // Total in each individual realization (unitarity check).
+    for (int iseed = 0; iseed < nseed; iseed++) {// Loop over the realizations of the disorder.
+        ofs << seed0 + iseed;
+        for (int iop = 0; iop < nopening; iop++) {
+            ofs << sep << alltavg(iop, iseed);
+        }
+        ofs << sep << total_tavg(0, iseed) << "\n";
+    }
+    
+    // Save the mean transmission over the realizations of the disorder:
+    RealMatrix mean_tavg = alltavg.mean_col();
+    ofs << "Mean";
+    for (int iop = 0; iop < nopening; iop++) {
+        ofs << sep << mean_tavg(iop, 0);
+    }
+    ofs << sep << total_tavg.mean() << "\n";
+    
+    // Save the standard deviation transmission over the realizations of the disorder:
+    RealMatrix stddev_tavg = alltavg.stddev_col();
+    ofs << "Stddev";
+    for (int iop = 0; iop < nopening; iop++) {
+        ofs << sep << stddev_tavg(iop, 0);
+    }
+    ofs << sep << total_tavg.stddev() << "\n";
+    ofs.close();  // Close the stream before calling an external script (this may cause I/O trouble).
+}
+
+/***************************************************************************************************
  * COMPUTATION OF ALL INSTANCES
  ***************************************************************************************************/
 
@@ -982,9 +1050,13 @@ int main(int argc, char** argv) {
     //SquareMesh mesh("model/waveguide-size-input-20_302x300.png");
     //SquareMesh mesh("model/waveguide-size-inout-20_302x300.png");
     //SquareMesh mesh("model/maze-tiny-1-calib_802x200.png"); // dscat=10.4 -> dscat_obs=12, dscat=6.97 -> dscat_obs=8, holscat=dscat/800.
-    SquareMesh mesh("model/maze-tiny-1_802x1201.png"); // dscat=10.4 -> dscat_obs=12, dscat=6.97 -> dscat_obs=8, holscat=dscat/800, nthread=4.
+    //SquareMesh mesh("model/maze-tiny-1_802x1201.png"); // dscat=10.4 -> dscat_obs=12, dscat=6.97 -> dscat_obs=8, holscat=dscat/800, nthread=4.
     //SquareMesh mesh("model/maze-tiny-1-calib_402x100.png"); // dscat=6.75 -> dscat_obs=8, holscat=dscat/400, nthread=10.
     //SquareMesh mesh("model/maze-tiny-1_402x601.png"); // dscat=6.75 -> dscat_obs=8, holscat=dscat/400, nthread=10.
+    //SquareMesh mesh("model/maze_abso_calib_1410x128.png"); // dscat=4 -> dscat_obs=5, holscat=dscat/1410.
+    //SquareMesh mesh("model/maze_abso_1410x1025.png"); // dscat=4 -> dscat_obs=5, holscat=dscat/1410, nthread=2.
+    SquareMesh mesh("model/small-complex-test-1_102x102.png");
+    //SquareMesh mesh("model/waveguide_102x100.png");
     
     /**
      * TABLE of effective scattering thickness for 300x900 slab waveguides with kh=1 and holscat=dscat/300:
@@ -1045,32 +1117,32 @@ int main(int argc, char** argv) {
      * 16.27    20
      * 12.53    15
      */
-    const double dscat = 6.97;  // Scattering depth, L/lscat.
+    const double dscat = 10.;  // Scattering depth, L/lscat.
     const double dabso = 0.;   // Absorption depth, L/labso.
     
     const double kh = 1.;  // Wavenumber times the lattice step. Avoid kh=1 because creates resonances when ninput = 3*integer + 2.
-    const double holscat = dscat/800; // Value of h/lscat.
-    const double holabso = dabso/800; // Value of h/labso.
+    const double holscat = dscat/100; // Value of h/lscat.
+    const double holabso = dabso/100; // Value of h/labso.
     const double density = 1.;  // Density of scatterers per pixel, between 0 and 1. Recommended is 1.
     
-    const std::string sysname = "maze-tiny-1_802x1201/kh_" + to_string_prec(kh, 6) + "/dscat_" + to_string_prec(dscat, 6) + "/dabso_" + to_string_prec(dabso, 6);
+    const std::string sysname = "small-complex-test-1_102x102/kh_" + to_string_prec(kh, 6) + "/dscat_" + to_string_prec(dscat, 6) + "/dabso_" + to_string_prec(dabso, 6);
     
     WaveSystem sys(sysname, mesh, kh, density, holscat, holabso);
     
-    //RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    //trange(0, 0) = 0.998;  trange(0, 1) = 0.002;
-    //trange(1, 0) = 0.500;  trange(1, 1) = 0.01;
-    //trange(2, 0) = 0.100;  trange(2, 1) = 0.005;
-    //trange(3, 0) = 0.001;  trange(3, 1) = 0.00005;
+    RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
+    trange(0, 0) = 0.998;  trange(0, 1) = 0.002;
+    trange(1, 0) = 0.500;  trange(1, 1) = 0.01;
+    trange(2, 0) = 0.100;  trange(2, 1) = 0.005;
+    trange(3, 0) = 0.001;  trange(3, 1) = 0.00005;
     
-    RealMatrix trange(7, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    trange(0, 0) = 0.98;  trange(0, 1) = 0.02;
-    trange(1, 0) = 0.88;  trange(1, 1) = 0.02;
-    trange(2, 0) = 0.84;  trange(2, 1) = 0.02;
-    trange(3, 0) = 0.80;  trange(3, 1) = 0.02;
-    trange(4, 0) = 0.76;  trange(4, 1) = 0.02;
-    trange(5, 0) = 0.72;  trange(5, 1) = 0.02;
-    trange(6, 0) = 0.68;  trange(6, 1) = 0.02;
+    //RealMatrix trange(7, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
+    //trange(0, 0) = 0.98;  trange(0, 1) = 0.02;
+    //trange(1, 0) = 0.88;  trange(1, 1) = 0.02;
+    //trange(2, 0) = 0.84;  trange(2, 1) = 0.02;
+    //trange(3, 0) = 0.80;  trange(3, 1) = 0.02;
+    //trange(4, 0) = 0.76;  trange(4, 1) = 0.02;
+    //trange(5, 0) = 0.72;  trange(5, 1) = 0.02;
+    //trange(6, 0) = 0.68;  trange(6, 1) = 0.02;
     
     //RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
     //trange(0, 0) = 0.53;  trange(0, 1) = 0.02;
@@ -1121,10 +1193,10 @@ int main(int argc, char** argv) {
     //ctx.sys.checkResidual();
     //ctx.sys.checkUnitarity(true);
     
-    const int nseed = 500;   // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
+    const int nseed = 100;    // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
     const int seed0 = 1;     // First seed used to generate realizations of the disorder. Actual seed = [seed0, seed0 + 1, ..., seed0 + nseed - 1]. 
                              // NB: Avoid seed0=0 for safety (some random generators are singular for seed=0).
-    const int nthread = 5;   // Number of threads used in multithreading with OpenMP.
+    const int nthread = 10;  // Number of threads used in multithreading with OpenMP.
     const int imode = 0;     // Index of the mode in taskIMode*() and taskIAllOMP().
     
     //taskCheckUnitarityOMP(ctx.sys, nseed, seed0, nthread);
@@ -1135,6 +1207,13 @@ int main(int argc, char** argv) {
     //taskIModeOMP(ctx.sys, imode, nseed, seed0, nthread);
     //taskITmaxIPlaneOMP(ctx.sys, nseed, seed0, nthread);
     taskIAllOMP(ctx.sys, ctx.trange, imode, nseed, seed0, nthread);
+    taskTBalanceOMP(ctx.sys, nseed, seed0, nthread);
+    
+    //std::cout << TAG_INFO << "====== RUNNING ADD_T_BALANCE() ======\n";
+    //RealMatrix tavg(mesh.getNOpening(), 1);
+    //ctx.sys.transmissionBalance(tavg);
+    //tavg.print("Tavg");
+    //std::cout << TAG_INFO << "Total = " << tavg.sum() << "\n";
     
     //taskJTransmissionOMP(ctx.sys, ctx.trange, nseed, seed0, nthread);
     //taskPsiTransmissionOMP(ctx.sys, ctx.trange, nseed, seed0, nthread);

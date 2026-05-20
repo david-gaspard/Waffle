@@ -77,7 +77,7 @@ void SquareMesh::checkReady(const std::string& name) const {
 /**
  * Return the point at position "i" in the mesh.
  */
-MeshPoint SquareMesh::getPoint(const uint i) const {
+MeshPoint SquareMesh::getPoint(const int i) const {
     checkReady("getPoint()");
     return point.at(i);  // vector objects already make bound checking.
 }
@@ -85,7 +85,7 @@ MeshPoint SquareMesh::getPoint(const uint i) const {
 /**
  * Returns the number of points in the mesh.
  */
-uint SquareMesh::getNPoint() const {
+int SquareMesh::getNPoint() const {
     checkReady("getNPoint()");
     return point.size();
 }
@@ -95,11 +95,11 @@ uint SquareMesh::getNPoint() const {
  * This method can be used for instance to determine the number of input/output channels in order to compute
  * the intensity profile of transmission eigenchannels (see: saveIntensities()).
  */
-uint SquareMesh::getNBoundary(const int bndtype) const {
+int SquareMesh::getNBoundary(const int bndtype) const {
     
     checkReady("getNBoundary()");
     
-    uint nbnd = 0;
+    int nbnd = 0;
     
     for (const MeshPoint& p : point) {// Loop on the points, looking for boundary conditions.
         nbnd += (p.north == bndtype) + (p.south == bndtype) + (p.east == bndtype) + (p.west == bndtype);
@@ -120,7 +120,7 @@ std::vector<Opening> SquareMesh::getOpening() const {
 /**
  * Returns the number of openings in the present SquareMesh object.
  */
-unsigned int SquareMesh::getNOpening() const {
+int SquareMesh::getNOpening() const {
     checkReady("getNOpening()");
     return opening.size();
 }
@@ -429,7 +429,7 @@ void SquareMesh::computeOpening() {
     
     opening.clear();  // Clears the opening in case it was already computed before.
     
-    for (unsigned int i = 0; i < point.size(); i++) {// Loop over the points using their index.
+    for (uint i = 0; i < point.size(); i++) {// Loop over the points using their index.
         p = point.at(i); // Extract the point
         for (Direction dir : allDirections) {// Loop over all the directions.
             if (p.isOpening(dir)) {// If the point contains an open boundary condition ("open", "input", or "output").
@@ -494,7 +494,7 @@ void SquareMesh::printOpening() const {
         std::cout << TAG_INFO << "Opening #" << iop << ", bnd=" << boundaryTypeString(opening.at(iop).bndtype)
                   << ", dir=" << directionString(opening.at(iop).direction) << " : [\n";
         
-        for (uint idx : opening.at(iop).index) {// Loop over the point indices composing the opening.
+        for (int idx : opening.at(iop).index) {// Loop over the point indices composing the opening.
             p = point.at(idx); // Corresponding point in the mesh.
             std::cout << "\t" << idx << " (" << p.x << ", " << p.y << ")" 
                       << ", north=" << boundaryTypeString(p.north) << ", south=" << boundaryTypeString(p.south) 

@@ -116,8 +116,15 @@ int WaveSystem::getNPoint() const {
 /**
  * Returns the i-th point of the mesh.
  */
-MeshPoint WaveSystem::getPoint(const unsigned int ipoint) const {
+MeshPoint WaveSystem::getPoint(const int ipoint) const {
     return mesh.getPoint(ipoint);
+}
+
+/**
+ * Returns the total number of openings (input or output leads).
+ */
+int WaveSystem::getNOpening() const {
+    return mesh.getNOpening();
 }
 
 /**
@@ -358,7 +365,7 @@ void WaveSystem::plotFields(const RealMatrix& fields, const std::vector<std::str
                         + ", expected nrow=" + std::to_string(npoint) + ".";
         throw std::invalid_argument(msg);
     }
-    else if (labels.size() != nfields) {
+    else if (static_cast<long int>(labels.size()) != nfields) {
         std::string msg = "In plotFields(): Invalid number of labels, received " + std::to_string(labels.size()) 
                         + "labels, expected " + std::to_string(nfields) + ".";
         throw std::invalid_argument(msg);
@@ -521,8 +528,7 @@ void WaveSystem::computeHamiltonian() {
     const std::vector<Opening> opening = mesh.getOpening(); // Extract the list of openings.
     Opening op;
     MeshPoint p;
-    uint iop;
-    int np, i, j, ip, jp;
+    int np, j, ip;
     
     // 1. Preallocate the sparse Hamiltonian and precompute the opening matrices:
     int nnzub = 5*npoint; // Computes an upper bound on the number of nonzero elements.
@@ -536,7 +542,7 @@ void WaveSystem::computeHamiltonian() {
     //std::cout << TAG_INFO << "Preallocated Hamiltonian with nnzub = " << nnzub << "\n";
     
     // 2. Build the Hamiltonian row per row:
-    for (i = 0; i < npoint; i++) {//Loop over the points of the mesh.
+    for (int i = 0; i < npoint; i++) {//Loop over the points of the mesh.
         
         p = mesh.getPoint(i);
         
@@ -553,13 +559,13 @@ void WaveSystem::computeHamiltonian() {
         }
         else {// If the point is actually in an opening.
             // Find to which opening the point p(i) belongs:
-            for (iop = 0; iop < opening.size(); iop++) {// Loop over the openings.
+            for (uint iop = 0; iop < opening.size(); iop++) {// Loop over the openings.
                 op = opening.at(iop);
                 auto ptr = lower_bound(op.index.begin(), op.index.end(), i);  // Find the point p(i) in the opening "op".
                 if (ptr != op.index.end() && *ptr == i) {// If the present opening contains the point p(i).
                     ip = std::distance(op.index.begin(), ptr); // Get the index of p(i) inside the opening.
                     np = op.index.size(); // Number of points in this opening.
-                    for (jp = 0; jp < np; jp++) {// Loop over the points in the present opening.
+                    for (int jp = 0; jp < np; jp++) {// Loop over the points in the present opening.
                         hamiltonian(i, op.index.at(jp)) = opmatrix.at(iop)(ip, jp);
                     }
                 }
@@ -725,7 +731,7 @@ void WaveSystem::computeIOStates() {
         }
         else if (op.bndtype == BND_OUTPUT) {// If the opening is an output, then construct the modes.
             
-            np = op.index.size();  // Number of point in the current input.
+            np = op.index.size();  // Number of point in the current output.
             ComplexMatrix u = modalMatrix(np);   // Construct the matrix of modes (each mode is normalized to 1).
             
             for (int j = 0; j < np; j++) {// Loop over the modes of U (columns of U).
@@ -897,8 +903,11 @@ void WaveSystem::checkUnitarity(const bool showtval) {
         ComplexMatrix u(noutputprop, noutputprop), vh(ninputprop, ninputprop);
         RealMatrix tval(ntval, 1);
         svd(tmat, tval, u, vh);  // Compute the singular value decomposition (SVD).
-        for (int i = 0; i < ntval; i++) tval(i, 0) = tval(i, 0)*tval(i, 0);  // COnvert singular values of "t" to transmission eigenvalues.
+        for (int i = 0; i < ntval; i++) {
+            tval(i, 0) = tval(i, 0)*tval(i, 0);  // Convert singular values of "t" to transmission eigenvalues.
+        }
         tval.transpose().print("Tval");
+        std::cout << TAG_INFO << "Tavg = " << tval.mean() << "\n";
     }
 }
 
@@ -1127,7 +1136,6 @@ void WaveSystem::addIIsotropic(RealMatrix& iavg) {
         }
         intensity /= ninputprop;
         iavg(ipoint, 0) += intensity;
-        // Warning: this formula does not take into account multiple input leads.
     }
 }
 
@@ -1168,7 +1176,7 @@ void WaveSystem::addIPlane_v1(RealMatrix& iplane, double& tplane) {
     
     // 1. First check for possible errors:
     if (iplane.getNrow() != npoint || iplane.getNcol() != 1) {
-        std::string msg = "In addIPlane(): Invalid size of 'iplane'. Received ("
+        std::string msg = "In addIPlane_v1(): Invalid size of 'iplane'. Received ("
                         + std::to_string(iplane.getNrow()) + ", " + std::to_string(iplane.getNcol()) + "), expected ("
                         + std::to_string(npoint) + ", 1).";
         throw std::invalid_argument(msg);
@@ -1207,7 +1215,7 @@ void WaveSystem::addIPlane_v2(RealMatrix& iplane, double& tplane) {
     
     // 1. First check for possible errors:
     if (iplane.getNrow() != npoint || iplane.getNcol() != 1) {
-        std::string msg = "In addIPlane(): Invalid size of 'iplane'. Received ("
+        std::string msg = "In addIPlane_v2(): Invalid size of 'iplane'. Received ("
                         + std::to_string(iplane.getNrow()) + ", " + std::to_string(iplane.getNcol()) + "), expected ("
                         + std::to_string(npoint) + ", 1).";
         throw std::invalid_argument(msg);
@@ -1521,5 +1529,205 @@ void WaveSystem::addDevTransmission(const RealMatrix& trange, RealMatrix& tdev, 
             }
         }
     }
+}
+
+/*********************************************************************************
+ * CLEANING THE MANAGEMENT OF INPUT/OUTPUT CHANNELS
+ ********************************************************************************/
+
+/**
+ * Computes and return the total number of propagating modes in the specific openings
+ * pointed by the list of indices "index" in the vector of openings returned by mesh.getOpening().
+ */
+int WaveSystem::getNProp(const std::vector<int>& index) const {
     
+    const double fac = (2./PI) * std::asin(kh/2. - KLHMIN*KLHMIN/(4.*kh));
+    int np, nprop = 0; // Initialize the number of input propagating modes (it will be incremented).
+    
+    for (const int iop : index) {// Loop over the indices of openings.
+        
+        np = mesh.getOpening().at(iop).index.size(); // Number of point in the current opening.
+        
+        /**
+         * kh2 + d2ev > KLHMIN^2 (> 0)
+         * 
+         * d2ev = -4.*sin((i+1)*PI/(2*(n+1)))^2
+         * 
+         * kh2 - 4*sin((i+1)*PI/(2*(n+1)))^2 > KLHMIN^2, i=[0, n-1]
+         * 
+         * nprop < (2*(n+1)/PI) * asin(sqrt((kh2 - KLHMIN^2)/4))
+         * 
+         * Using the approx: sqrt((kh2 - KLHMIN^2)/4) <= kh/2 - KLHMIN^2/(4*kh)
+         * 
+         * nprop = std::floor( (2*(n+1)/PI) * std::asin(kh/2 - KLHMIN^2/(4*kh)) );
+         */
+        nprop += std::floor(fac*(np + 1));
+    }
+    
+    return nprop;
+}
+
+/**
+ * Prepare the "state" matrix which contains in each columns the unitary propagating modes in the specific openings
+ * pointed by the list of indices "index" in the vector of openings returned by mesh.getOpening().
+ * For each mode, the corresponding longitudinal wavenumber is stored in "klh" and the total density of states "dos" is computed.
+ */
+void WaveSystem::wavefrontState(const std::vector<int>& index, SparseComplexMatrix& state, ComplexMatrix& klh, double& dos) const {
+    
+    // 1. Check for possible errors:
+    int nprop = getNProp(index);
+    if (state.getNrow() != npoint || state.getNcol() != nprop) {
+        std::string msg = "In wavefrontState(): Invalid size of 'state'. Received ("
+                        + std::to_string(state.getNrow()) + ", " + std::to_string(state.getNcol()) + "), expected ("
+                        + std::to_string(npoint) + ", " + std::to_string(nprop) + ").";
+        throw std::invalid_argument(msg);
+    }
+    else if (klh.getNrow() != nprop || klh.getNcol() != 1) {
+        std::string msg = "In wavefrontState(): Invalid size of 'klh'. Received ("
+                        + std::to_string(klh.getNrow()) + ", " + std::to_string(klh.getNcol()) + "), expected ("
+                        + std::to_string(nprop) + ", 1).";
+        throw std::invalid_argument(msg);
+    }
+    
+    // 2. Construct the input/output modes :
+    const dcomplex kh2 = khc*khc;
+    const double klhmin2 = KLHMIN*KLHMIN; // Minimum value of klh^2 for a mode to be considered as a propagating.
+    dcomplex d2pkh2, klh_j;
+    int np;         // Number of points in the current opening.
+    int nptot = 0;  // Total number of points in all openings pointed by "index".
+    int jmode = 0;  // Current number of input modes.
+    dos = 0.;   // Initialize the density of states in the openings.
+    
+    for (const int iop : index) {// Loop over the selected openings.
+        
+        const Opening op = mesh.getOpening().at(iop);
+        np = op.index.size(); // Number of point in the current opening.
+        nptot += np;  // Compute the total number of points.
+        const ComplexMatrix u = modalMatrix(np);   // Construct the matrix of modes (each mode is normalized to 1).
+        
+        for (int j = 0; j < np; j++) {// Loop over the modes of U (columns of U).
+            
+            d2pkh2 = laplacianEigenvalue(j, np) + kh2;  // j^th eigenvalue of D_y^2 + (kh)^2 for an operator of size "np". Close to klh^2.
+            
+            if (d2pkh2.real() > klhmin2) {// If the mode is propagating.
+                
+                klh_j = std::sqrt( d2pkh2 * ( 1. - d2pkh2/4. ) );  // Compute the effective longitudinal wavenumber.
+                
+                for (int i = 0; i < np; i++) {// Loop over the points in the opening (rows of U).
+                    state(op.index.at(i), jmode) = u(i, j);
+                }
+                klh(jmode, 0) = klh_j;
+                dos += 1./klh_j.real();  // Increments the DOS in the input opening.
+                jmode++;
+            }
+        }
+    }
+    
+    // Finalize the sparse matrix (sort the elements):
+    state.finalize();
+    if (jmode != nprop) {// Print some warning.
+        std::cout << TAG_WARN << "Computed jmode=" << jmode << " modes, but planned nprop=" << nprop << ".\n";
+    }
+    
+    // Normalize the density of states:
+    dos /= 2*PI*nptot;  // Note that it is the total number of points in the openings (this includes evanescent modes).
+}
+
+/**
+ * Computes some blocks of the scattering S matrix.
+ * The only available blocks are those for which the inputs are fixed by the BND_INPUT boundary condition.
+ * The desired outputs openings are given by the "index" vector which gathers the indices of output openings in the vector returned by mesh.getOpening().
+ */
+void WaveSystem::SBlockMatrix(const std::vector<int>& index, ComplexMatrix& smat) {
+    
+    // 1. First check for possible errors:
+    int nprop = getNProp(index);
+    if (smat.getNrow() != nprop || smat.getNcol() != ninputprop) {
+        std::string msg = "In SBlockMatrix(): Invalid size of 'smat'. Received ("
+                        + std::to_string(smat.getNrow()) + ", " + std::to_string(smat.getNcol()) + "), expected ("
+                        + std::to_string(nprop) + ", " + std::to_string(ninputprop) + ").";
+        throw std::invalid_argument(msg);
+    }
+    
+    // 2. Compute the S matrix:
+    SparseComplexMatrix state(npoint, nprop);
+    ComplexMatrix klh(nprop, 1); // Vector containing the longitudinal wavenumbers of each output mode (column) of "state".
+    double dos = 0.;
+    wavefrontState(index, state, klh, dos); 
+    computeGreenFunction();  // Ensure that the Green function has been computed (this does nothing if it is so).
+    smat = state.conj() * green;  // Project the Green function over the output states.
+    
+    // 3. Apply the Fisher & Lee relation :
+    for (int i = 0; i < nprop; i++) {// Loop over the output channels (rows).
+        for (int j = 0; j < ninputprop; j++) {// Loop over the input channels (columns).
+            smat(i, j) = 2. * I * std::sqrt(inputKlh(j, 0).real() * klh(i, 0).real()) * smat(i, j);
+            // Note that the real parts strip the evanescent modes.
+        }
+    }
+    
+    // 4. Construct the "inputIndex" vector, i.e., the list of indices of input openings:
+    std::vector<int> inputIndex; // Initialize an empty vector.
+    for (int iop = 0; iop < mesh.getNOpening(); iop++) {
+        if (mesh.getOpening().at(iop).bndtype == BND_INPUT) // If the opening is an input, then append the index to the "inputIndex" vector.
+            inputIndex.push_back(iop);
+    }
+    
+    // 5. Subtract the identity matrix to the reflection blocks of the S matrix according to the Fisher & Lee relation:
+    int irefl, jrefl;
+    for (uint iout = 0; iout < index.size(); iout++) {// Loop over the output opening indices.
+        for (uint iin = 0; iin < inputIndex.size(); iin++) {// Loop over the input opening indices.
+            if (inputIndex.at(iin) == index.at(iout)) {// Reflection block detected.
+                
+                // Compute the coordinates of the reflection block inside the S matrix:
+                std::vector<int> prevIndex(index.begin(), index.begin()+iout);
+                irefl = getNProp(prevIndex);  // Number of propagating modes before present block.
+                
+                std::vector<int> prevInputIndex(inputIndex.begin(), inputIndex.begin()+iin);
+                jrefl = getNProp(prevInputIndex);
+                
+                std::vector<int> curInputIndex(1, inputIndex.at(iin));
+                nprop = getNProp(curInputIndex); // Number of propagating modes in the present reflection block.
+                
+                for (int di = 0; di < nprop; di++) {// Loop over the diagonal of the reflection block.
+                    smat(irefl+di, jrefl+di) -= 1.;
+                    // Note Fisher & Lee: r_ij = -delta_ij + 2*I*sqrt(k_i*k_j)*G(Input mode i | Input mode j).
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Computes the average transmission probability in every opening and stored them in "tavg".
+ * The RealMatrix "tavg" is assumed to be of dimension (nopening, 1).
+ * This function computes the transmission probabilities from the transmission matrices and so there is no wavefront shaping.
+ * Each element in "tavg" corresponds to the opening at the same position in the vector returned by mesh.getOpening().
+ */
+void WaveSystem::transmissionBalance(RealMatrix& tavg) {
+    
+    // 1. Check for possible errors:
+    if (tavg.getNrow() != mesh.getNOpening() || tavg.getNcol() != 1) {
+        std::string msg = "In transmissionBalance(): Invalid size of 'tavg'. Received ("
+                        + std::to_string(tavg.getNrow()) + ", " + std::to_string(tavg.getNcol()) + "), expected ("
+                        + std::to_string(mesh.getNOpening()) + ", 1).";
+        throw std::invalid_argument(msg);
+    }
+    
+    // 2. Compute the average transmission in other individual openings:
+    int nprop, nproptot = 0;
+    std::vector<int> index(1, 0); // The index has only one element because we want the S blocks for each output separately.
+    for (int iop = 0; iop < mesh.getNOpening(); iop++) {// Loop over the openings.
+        
+        // Compute the transmission submatrix corresponding to the current opening:
+        index.at(0) = iop;  // Assign "iop" as the only opening index in the vector "index".
+        nprop = getNProp(index); // Get the number of propagating modes in the output opening of index "iop".
+        ComplexMatrix sblock(nprop, ninputprop);
+        SBlockMatrix(index, sblock); // Compute the S block corresponding to output in opening of index "iop".
+        
+        // Compute the average transmission in the current opening:
+        tavg(iop, 0) = sblock.sumsquare();
+        nproptot += nprop;
+    }
+    
+    tavg = tavg/static_cast<double>(std::min(nproptot, ninputprop));
 }

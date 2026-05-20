@@ -57,11 +57,13 @@ class WaveSystem {
     
     // Getters:
     int getNPoint() const;
-    MeshPoint getPoint(const unsigned int ipoint) const;
+    MeshPoint getPoint(const int ipoint) const;
+    int getNOpening() const;
     int getNInput() const;
     int getNOutput() const;
     int getNInputProp() const;
     int getNOutputProp() const;
+    int getNProp(const std::vector<int>& index) const;
     double getWavenumber() const;
     double getDensity() const;
     double getScattering() const;
@@ -77,7 +79,7 @@ class WaveSystem {
     void plotMatrixInputState() const;
     void plotMatrixOutputState() const;
     void plotMesh() const;
-    void plotIntensity(const RealMatrix& intensity, const std::string& description, const std::string& filename) const;
+    void plotIntensity(const RealMatrix& intensity, const std::string& description, const std::string& dataname) const;
     void plotFields(const RealMatrix& fields, const std::vector<std::string>& labels, const std::string& description, const std::string& plotname) const;
     void plotGreenFunction();
     void plotInputModes(const int nmode);
@@ -87,6 +89,7 @@ class WaveSystem {
     void setDisorder(const uint64_t seed);
     void transmissionMatrix(ComplexMatrix& tmat);
     void reflectionMatrix(ComplexMatrix& rmat);
+    void SBlockMatrix(const std::vector<int>& index, ComplexMatrix& smat);
     void checkUnitarity(const bool showtval);
     void checkResidual();
     void addITransmission(const RealMatrix& trange, RealMatrix& tprofile, RealMatrix& nsample, RealMatrix& tval);
@@ -98,6 +101,7 @@ class WaveSystem {
     void addJTransmission(const RealMatrix& trange, RealMatrix& tcurrent, RealMatrix& nsample);
     void addPsiTransmission(const RealMatrix& trange, RealMatrix& tpsi, RealMatrix& nsample);
     void addDevTransmission(const RealMatrix& trange, RealMatrix& tdev, RealMatrix& nsample);
+    void transmissionBalance(RealMatrix& tavg);
     
     private:
     
@@ -113,6 +117,7 @@ class WaveSystem {
     int computeNInputProp() const;
     int computeNOutputProp() const;
     void computeIOStates();
+    void wavefrontState(const std::vector<int>& index, SparseComplexMatrix& state, ComplexMatrix& klh, double& dos) const;
     void computeGreenFunction();
     void computeTransmissionStates(ComplexMatrix& tstate, RealMatrix& tval);
     void currentAt(const ComplexMatrix& psi, const int istate, const int ipoint, double& jx, double& jy) const;

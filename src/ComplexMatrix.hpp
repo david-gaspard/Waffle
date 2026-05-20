@@ -34,6 +34,7 @@ class ComplexMatrix {
     ComplexMatrix& operator=(const ComplexMatrix& a);
     
     // Mathematical operations:
+    double sumsquare() const;
     double norm() const;
     ComplexMatrix conj() const;
     RealMatrix real() const;
