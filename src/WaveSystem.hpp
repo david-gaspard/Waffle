@@ -58,6 +58,7 @@ class WaveSystem {
     // Getters:
     int getNPoint() const;
     MeshPoint getPoint(const int ipoint) const;
+    std::vector<Opening> getOpening() const;
     int getNOpening() const;
     int getNInput() const;
     int getNOutput() const;

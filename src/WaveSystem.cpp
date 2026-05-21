@@ -121,6 +121,13 @@ MeshPoint WaveSystem::getPoint(const int ipoint) const {
 }
 
 /**
+ * Return the openings of the mesh.
+ */
+std::vector<Opening> WaveSystem::getOpening() const {
+    return mesh.getOpening();
+}
+
+/**
  * Returns the total number of openings (input or output leads).
  */
 int WaveSystem::getNOpening() const {
@@ -340,12 +347,14 @@ void WaveSystem::plotIntensity(const RealMatrix& intensity, const std::string& d
     }
     ofs.close();  // Close the stream before calling an external script (this may cause I/O trouble).
     
-    std::string cmd = "plot/plot_map.py lin I0 " + std::to_string(holscat) +  " auto " + filename;
-    std::cout << TAG_EXEC << cmd << "\n";
-    if (std::system(cmd.c_str())) {
-        std::cout << TAG_WARN << "The plot script returned an error.\n";
-    }
+    // Plot the I0 state:
+    //std::string cmd = "plot/plot_map.py lin I0 " + std::to_string(holscat) +  " auto " + filename;
+    //std::cout << TAG_EXEC << cmd << "\n";
+    //if (std::system(cmd.c_str())) {
+    //    std::cout << TAG_WARN << "The plot script returned an error.\n";
+    //}
     
+    // Plot the average of all states:
     //cmd = "plot/plot_map_avg.py lin " + std::to_string(nstate) + " " + std::to_string(holscat) +  " auto " + filename;
     //std::cout << TAG_EXEC << cmd << "\n";
     //if (std::system(cmd.c_str())) {
