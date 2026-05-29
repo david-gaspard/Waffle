@@ -22,7 +22,15 @@ def plot_histo(args):
     ## Import the data:
     #start = time.time()
     samples = np.genfromtxt(sample_file, delimiter=",", comments="%")
-    samples = samples[1:, :]
+    
+    if (samples.ndim == 1):
+        samples = samples[1:]
+    elif (samples.ndim == 2):
+        samples = samples[1:, :]
+    else:
+        print(ct.TAG_ERROR + "Invalid sample dimension, received " + str(samples.ndim) + ", expected 1 or 2...")
+        return 1
+    
     #end = time.time()
     #print(ct.TAG_INFO + "File imported in", end - start, "s.")
     

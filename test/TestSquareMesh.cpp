@@ -86,7 +86,7 @@ int testMeshPolygon2() {
     mesh.finalize();
     
     // Save the mesh to a file for checking:
-    const std::string filename = "out/test/mesh/test_mesh_polygon_2.csv";
+    const std::string filename = "old/test/mesh/test_mesh_polygon_2.csv";
     std::cout << TAG_INFO << "Saving SquareMesh to file '" << filename << "'...\n";
     mesh.saveMeshShort(filename, ", ");
     
@@ -103,13 +103,13 @@ int testMeshPolygon3() {
     
     double scale = 60; // Scales the polygon.
     
-    mesh.addPolygon("shape/eiffel-tower.csv", scale, BND_MIRROR);
+    mesh.addPolygon("old/test/mesh/eiffel_tower.csv", scale, BND_MIRROR);
     
     // Fix the nearest neighbors to finalize. This operation is mandatory:
     mesh.finalize();
     
     // Save the mesh to a file for checking:
-    const std::string filename = "out/test/mesh/test_mesh_polygon_3.csv";
+    const std::string filename = "old/test/mesh/test_mesh_polygon_3.csv";
     std::cout << TAG_INFO << "Saving SquareMesh to file '" << filename << "'...\n";
     mesh.saveMeshShort(filename, ", ");
     
@@ -131,6 +131,34 @@ int testMeshImage() {
 }
 
 /**
+ * Test the polygon generation of SquareMesh object, but using the coordinates from a file.
+ */
+int testMeshRemovePolygon() {
+    std::cout << "====== TEST SQUARE MESH REMOVE POLYGON ======\n";
+    
+    SquareMesh mesh; // Declare the mesh.
+    mesh.addRectangle(-50, 50, -50, 50, BND_MIRROR);
+    
+    const std::vector<Vector2D> polygon = {
+        Vector2D( 25, 0  ), Vector2D( 20, 12 ), Vector2D( 10, 20 ), Vector2D( -5, 18 ), Vector2D(-16, 13 ),
+        Vector2D(-27, 4  ), Vector2D(-25, -6 ), Vector2D(-19, -8 ), Vector2D(-12, -15), Vector2D( -3, -32),
+        Vector2D(  5, -35), Vector2D( 14, -23), Vector2D( 10, -11), Vector2D(  2, -9 ), Vector2D( -3, -15),
+        Vector2D(  1, -24), Vector2D( 12, -21), Vector2D( 22, -10)
+    };
+    
+    mesh.removePolygon(polygon);
+    
+    // Fix the nearest neighbors to finalize. This operation is mandatory:
+    mesh.finalize();
+    
+    // Save the mesh to a file for checking:
+    const std::string filename = "old/test/mesh/test_mesh_remove_polygon.csv";
+    mesh.plotMesh(filename);
+    
+    return 0;
+}
+
+/**
  * Main function of the test of the SquareMesh object.
  */
 int main(int argc, char** argv) {
@@ -139,5 +167,6 @@ int main(int argc, char** argv) {
     //testMeshPolygon1();
     //testMeshPolygon2();
     //testMeshPolygon3();
-    testMeshImage();
+    //testMeshImage();
+    testMeshRemovePolygon();
 }

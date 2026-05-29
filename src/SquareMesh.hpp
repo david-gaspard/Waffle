@@ -17,8 +17,8 @@
 struct Opening {
     
     std::vector<int> index;  // Indices of points involved in the present opening. The indices correspond to the vector "point" (see: SquareMesh).
-                              // Note: As an alternative, this object could also store a copy of the mesh points, instead of the indices,
-                              // but then the mesh points must store their own index.
+                             // Note: As an alternative, this object could also store a copy of the mesh points, instead of the indices,
+                             // but then the mesh points must store their own index.
     Direction direction;  // Boundary direction of the present opening.
     int bndtype;          // Type of boundary condition (either "input", "output", or "open").
     
@@ -58,16 +58,15 @@ class SquareMesh {
     
     // Add points:
     void addPoint(const int x, const int y, const int bndtype);
-    void addRectangle(int xmin, int xmax, int ymin, int ymax, const int bndtype);
-    void addDisk(const int x0, const int y0, const double radius, const int bndtype);
+    void addRectangle(const int xmin, const int xmax, const int ymin, const int ymax, const int bndtype);
+    void addDisk(const double x0, const double y0, const double radius, const int bndtype);
     void addPolygon(const std::vector<Vector2D>& polygon, const int bndtype);
     void addPolygon(const char* filename, const double scale, const int bndtype);
     
     // Remove points:
     void removePoint(const int x, const int y);
-    void removeRectangle(int xmin, int xmax, int ymin, int ymax);
-    void removeDisk(const int x0, const int y0, const double radius);
-    void removeHalfDisk(const int x0, const int y0, const double radius);
+    void removeRectangle(const int xmin, const int xmax, const int ymin, const int ymax);
+    void removeDisk(const double x0, const double y0, const double radius);
     void removePolygon(const std::vector<Vector2D>& polygon);
     
     // Assign boundary conditions:

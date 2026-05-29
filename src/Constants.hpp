@@ -35,4 +35,7 @@ static const double MEPS       = 1.11e-16;  // Machine epsilon in double precisi
 static const double SQRTEPS    = 1.053e-8;  // Square root of the machine epsilon in double precision, SQRTEPS = MEPS^(1/2) = 2^(-53/2), used for discrete derivatives with forward difference formula.
 static const double CBRTEPS    = 4.806e-6;  // Cubic root of the machine epsilon in double precision, CBRTEPS = MPS^(1/3) = 2^(-53/3), used for discrete derivatives with central difference formula.
 
+// Verbosity and other debugging options:
+static const int VERBOSE = 0;  //Verbosity level (0=Quiet, 1=Show information, 2=Show all computation times).
+
 #endif

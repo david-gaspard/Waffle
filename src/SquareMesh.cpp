@@ -15,7 +15,9 @@
  * Constructor of the Square Mesh object.
  */
 SquareMesh::SquareMesh() {
-    std::cout << TAG_INFO << "Creating SquareMesh... ";
+    if (VERBOSE >= 1) {
+        std::cout << TAG_INFO << "Creating SquareMesh... ";
+    }
     ready = false;
     start_build = std::chrono::steady_clock::now(); // Measure time from SquareMesh creation (for information only).
 }
@@ -32,7 +34,9 @@ SquareMesh::SquareMesh() {
  * Mirror boundary conditions (Dirichlet, psi=0) are used by default.
  */
 SquareMesh::SquareMesh(const std::string& pngfile) {
-    std::cout << TAG_INFO << "Creating SquareMesh from file '" << pngfile << "'... ";
+    if (VERBOSE >= 1) {
+        std::cout << TAG_INFO << "Creating SquareMesh from file '" << pngfile << "'... ";
+    }
     ready = false;
     start_build = std::chrono::steady_clock::now(); // Measure time from SquareMesh creation (for information only).
     const Image img(pngfile); // Load the PNG image.
@@ -174,18 +178,17 @@ void SquareMesh::addRectangle(int xmin, int xmax, int ymin, int ymax, const int 
 /**
  * Add a circular region to the mesh.
  */
-void SquareMesh::addDisk(int x0, int y0, double radius, const int bndtype) {
-    int xmin = (int) std::floor(x0 - radius);
-    int xmax = (int) std::ceil (x0 + radius);
-    int ymin = (int) std::floor(y0 - radius);
-    int ymax = (int) std::ceil (y0 + radius);
-    int r2 = (int) std::ceil(radius*radius);
-    int dx, dy;
+void SquareMesh::addDisk(const double x0, const double y0, const double radius, const int bndtype) {
+    const int xmin = static_cast<int>(std::floor(x0 - radius));
+    const int xmax = static_cast<int>(std::ceil (x0 + radius));
+    const int ymin = static_cast<int>(std::floor(y0 - radius));
+    const int ymax = static_cast<int>(std::ceil (y0 + radius));
+    double dx, dy;
     for (int x = xmin; x <= xmax; x++) {// Loop on the square lattice in reading order.
         for (int y = ymax; y >= ymin; y--) {
             dx = x - x0;
             dy = y - y0;
-            if (dx*dx + dy*dy <= r2) {
+            if (dx*dx + dy*dy <= radius*radius) {
                 addPoint(x, y, bndtype);
             }
         }
@@ -267,74 +270,33 @@ void SquareMesh::removeRectangle(int xmin, int xmax, int ymin, int ymax) {
     if (xmin > xmax) std::swap(xmin, xmax);
     if (ymin > ymax) std::swap(ymin, ymax);
     
-    for (int x = xmin; x <= xmax; x++) {// Loop on the square lattice in reading order.
-        for (int y = ymax; y >= ymin; y--) {
-            removePoint(x, y);
-        }
-    }
+    // Use remove_if() to erase points efficiently:
+    point.erase(std::remove_if(point.begin(), point.end(),
+        [xmin, xmax, ymin, ymax](MeshPoint p) { 
+            return  xmin <= p.x && p.x <= xmax && ymin <= p.y && p.y <= ymax; 
+        }), point.end());
 }
 
 /**
  * Remove a circular region from the mesh.
  */
-void SquareMesh::removeDisk(const int x0, const int y0, const double radius) {
-    int xmin = (int) std::floor(x0 - radius);
-    int xmax = (int) std::ceil (x0 + radius);
-    int ymin = (int) std::floor(y0 - radius);
-    int ymax = (int) std::ceil (y0 + radius);
-    int r2 = (int) std::ceil(radius*radius);
-    int dx, dy;
-    for (int x = xmin; x <= xmax; x++) {// Loop on the square lattice in reading order.
-        for (int y = ymax; y >= ymin; y--) {
-            dx = x - x0;
-            dy = y - y0;
-            if (dx*dx + dy*dy <= r2) {
-                removePoint(x, y);
-            }
-        }
-    }
-}
-
-/**
- * Remove half a circular region from the mesh (only the upper half disk).
- */
-void SquareMesh::removeHalfDisk(const int x0, const int y0, const double radius) {
-    int xmin = (int) std::floor(x0 - radius);
-    int xmax = (int) std::ceil (x0 + radius);
-    int ymin = y0;
-    int ymax = (int) std::ceil (y0 + radius);
-    int r2 = (int) std::ceil(radius*radius);
-    int dx, dy;
-    for (int x = xmin; x <= xmax; x++) {// Loop on the square lattice in reading order.
-        for (int y = ymax; y >= ymin; y--) {
-            dx = x - x0;
-            dy = y - y0;
-            if (dx*dx + dy*dy <= r2) {
-                removePoint(x, y);
-            }
-        }
-    }
+void SquareMesh::removeDisk(const double x0, const double y0, const double radius) {
+    // Use remove_if() to erase points efficiently:
+    point.erase(std::remove_if(point.begin(), point.end(),
+        [x0, y0, radius](MeshPoint p) {
+            return (p.x-x0)*(p.x-x0) + (p.y-y0)*(p.y-y0) <= radius*radius;
+        }), point.end());
 }
 
 /**
  * Removes a polygon region from the mesh. Uses the even-odd rule.
  */
 void SquareMesh::removePolygon(const std::vector<Vector2D>& polygon) {
-    
-    // 1. Determine the bounds of the polygon:
-    int xmin, xmax, ymin, ymax;
-    polygonBounds(polygon, xmin, xmax, ymin, ymax);
-    
-    // 2. Loop on points in the rectangular region:
-    Vector2D p;
-    for (int x = xmin; x <= xmax; x++) {// Loop on the square lattice in reading order.
-        for (int y = ymax; y >= ymin; y--) {
-            p = Vector2D(x, y);   // Current point that we attempt to add to the mesh.
-            if (p.windingNumber(polygon) % 2 != 0) {// Uses the even-odd rule to remove the polygon.
-                removePoint(x, y);
-            }
-        }
-    }
+    // Use remove_if() to erase points efficiently:
+    point.erase(std::remove_if(point.begin(), point.end(),
+        [polygon](MeshPoint p) {
+            return Vector2D(p).windingNumber(polygon) % 2 != 0;
+        }), point.end());
 }
 
 /**
@@ -468,8 +430,10 @@ void SquareMesh::finalize() {
         computeOpening(); // Compute the openings, ~O(N).
         ready = true; // The SquareMesh gets ready for computations.
         
-        double ctime_build = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_build).count();
-        std::cout << "Done in " << ctime_build << " s.\n";
+        if (VERBOSE >= 1) {
+            double ctime_build = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_build).count();
+            std::cout << "Done in " << ctime_build << " s.\n";
+        }
     }
 }
 
@@ -575,9 +539,14 @@ void SquareMesh::saveMeshShort(const std::string& filename, const char* sep) con
  * The name of the CSV file written by saveMesh() is "filename".
  */
 void SquareMesh::plotMesh(const std::string& filename) const {
+    
     saveMesh(filename, ", ");
-    std::string cmd("plot/plot_mesh.py " + filename);
-    std::cout << TAG_EXEC << cmd << "\n";
+    std::string cmd("plot/plot_mesh.py -e 0 " + filename);
+    
+    if (VERBOSE >= 1) {
+        std::cout << TAG_EXEC << cmd << "\n";
+    }
+    
     if (std::system(cmd.c_str())) {
         std::cout << TAG_WARN << "The plot script returned an error.\n";
     }

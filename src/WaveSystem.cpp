@@ -82,7 +82,7 @@ double WaveSystem::checkScattering(const double holscat) const {
     if (holscat < 0.) {
         throw std::invalid_argument("In checkScattering(): Scattering strength cannot be negative.");
     }
-    else if (kh < holscat) {
+    else if (kh < holscat && VERBOSE >= 1) {
         std::cout << TAG_WARN << "Scattering strength is large (k*lscat=" << kh/holscat << " <1). Localization may occur.\n";
     }
     return holscat;
@@ -253,8 +253,10 @@ void WaveSystem::plotMatrixHamiltonian() const {
     
     hamiltonian.savePNG(filename);
     
-    double ctime = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
-    std::cout << TAG_INFO << "Hamiltonian saved to file '" << filename << "' in " << ctime << " s.\n";
+    if (VERBOSE >= 1) {
+        double ctime = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
+        std::cout << TAG_INFO << "Hamiltonian saved to file '" << filename << "' in " << ctime << " s.\n";
+    }
 }
 
 /**
@@ -267,8 +269,10 @@ void WaveSystem::plotMatrixInputState() const {
     
     inputState.savePNG(filename);
     
-    double ctime = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
-    std::cout << TAG_INFO << "Input state saved to file '" << filename << "' in " << ctime << " s.\n";
+    if (VERBOSE >= 1) {
+        double ctime = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
+        std::cout << TAG_INFO << "Input state saved to file '" << filename << "' in " << ctime << " s.\n";
+    }
 }
 
 /**
@@ -281,8 +285,10 @@ void WaveSystem::plotMatrixOutputState() const {
     
     outputState.savePNG(filename);
     
-    double ctime = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
-    std::cout << TAG_INFO << "Input state saved to file '" << filename << "' in " << ctime << " s.\n";
+    if (VERBOSE >= 1) {
+        double ctime = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start).count();
+        std::cout << TAG_INFO << "Input state saved to file '" << filename << "' in " << ctime << " s.\n";
+    }
 }
 
 /**
@@ -313,8 +319,11 @@ void WaveSystem::plotIntensity(const RealMatrix& intensity, const std::string& d
     const char* sep = ", ";  // Separator used between entries of the CSV file.
     const int prec = 16;     // Precision used in printing double precision values.
     const std::string filename = uniqueFile(dataname, ".csv");
-    const double fsize = ( (prec+4.)*nstate + 3.*DIMENSION*(std::log10(npoint)+2.) ) * static_cast<double>(npoint);  // Roughly estimated file size in bytes (octets).
-    std::cout << TAG_INFO << "Save intensity to file '" << filename << "', size ~" << (fsize/1e6) << " Mo...\n";
+    
+    if (VERBOSE >= 1) {
+        const double fsize = ( (prec+4.)*nstate + 3.*DIMENSION*(std::log10(npoint)+2.) ) * static_cast<double>(npoint);  // Roughly estimated file size in bytes (octets).
+        std::cout << TAG_INFO << "Save intensity to file '" << filename << "', size ~" << (fsize/1e6) << " Mo...\n";
+    }
     
     std::ofstream ofs(filename); // Open the output file.
     ofs << std::setprecision(prec); // Set the printing precision.
@@ -348,15 +357,19 @@ void WaveSystem::plotIntensity(const RealMatrix& intensity, const std::string& d
     ofs.close();  // Close the stream before calling an external script (this may cause I/O trouble).
     
     // Plot the I0 state:
-    //std::string cmd = "plot/plot_map.py lin I0 " + std::to_string(holscat) +  " auto " + filename;
-    //std::cout << TAG_EXEC << cmd << "\n";
-    //if (std::system(cmd.c_str())) {
-    //    std::cout << TAG_WARN << "The plot script returned an error.\n";
-    //}
+    std::string cmd = "plot/plot_map.py -u " + std::to_string(holscat) +  " I0 " + filename;
+    if (VERBOSE >= 1) {
+        std::cout << TAG_EXEC << cmd << "\n";
+    }
+    if (std::system(cmd.c_str())) {
+        std::cout << TAG_WARN << "The plot script returned an error.\n";
+    }
     
     // Plot the average of all states:
-    //cmd = "plot/plot_map_avg.py lin " + std::to_string(nstate) + " " + std::to_string(holscat) +  " auto " + filename;
-    //std::cout << TAG_EXEC << cmd << "\n";
+    //cmd = "plot/plot_map_avg.py -u " + std::to_string(holscat) + " " + std::to_string(nstate) + " " + filename;
+    //if (VERBOSE >= 1) {
+    //    std::cout << TAG_EXEC << cmd << "\n";
+    //}
     //if (std::system(cmd.c_str())) {
     //    std::cout << TAG_WARN << "The plot script returned an error.\n";
     //}
@@ -390,8 +403,11 @@ void WaveSystem::plotFields(const RealMatrix& fields, const std::vector<std::str
     const char* sep = ", ";  // Separator used between entries of the CSV file.
     const int prec = 16;     // Precision used in printing double precision values.
     const std::string filename = uniqueFile(plotname, ".csv");
-    const double fsize = ( (prec+4.)*nfields + 3.*DIMENSION*(std::log10(npoint)+2.) ) * static_cast<double>(npoint);  // Roughly estimated file size in bytes (octets).
-    std::cout << TAG_INFO << "Save intensity to file '" << filename << "', size ~" << (fsize/1e6) << " Mo...\n";
+    
+    if (VERBOSE >= 1) {
+        const double fsize = ( (prec+4.)*nfields + 3.*DIMENSION*(std::log10(npoint)+2.) ) * static_cast<double>(npoint);  // Roughly estimated file size in bytes (octets).
+        std::cout << TAG_INFO << "Save intensity to file '" << filename << "', size ~" << (fsize/1e6) << " Mo...\n";
+    }
     
     // 3. Write the header:
     std::ofstream ofs(filename); // Open the output file.
@@ -427,8 +443,10 @@ void WaveSystem::plotFields(const RealMatrix& fields, const std::vector<std::str
     ofs.close();  // Close the stream before calling an external script (this may cause I/O trouble).
     
     // 5. Plot the data by calling an external script:
-    std::string cmd = "plot/plot_map.py lin " + labels.at(0) + " " + std::to_string(holscat) +  " auto " + filename;
-    std::cout << TAG_EXEC << cmd << "\n";
+    std::string cmd = "plot/plot_map.py -u " + std::to_string(holscat) + " " + labels.at(0) +  " " + filename;
+    if (VERBOSE >= 1) {
+        std::cout << TAG_EXEC << cmd << "\n";
+    }
     if (std::system(cmd.c_str())) {
         std::cout << TAG_WARN << "The plot script returned an error.\n";
     }
@@ -530,7 +548,9 @@ void WaveSystem::plotTransmissionStates(const int nstate) {
  * Creates the free part of the "Hamiltonian", (d_x^2 + d_y^2 + k^2) * h^2, and store the result within the present WaveSystem object.
  */
 void WaveSystem::computeHamiltonian() {
-    std::cout << TAG_INFO << "Building the Hamiltonian... ";
+    if (VERBOSE >= 1) {
+        std::cout << TAG_INFO << "Building the Hamiltonian... ";
+    }
     const auto start_build = std::chrono::steady_clock::now(); // Gets the current time.
     
     const dcomplex kh2 = khc*khc;
@@ -548,7 +568,9 @@ void WaveSystem::computeHamiltonian() {
         opmatrix.push_back(openingMatrix(kh2, np));
     }
     hamiltonian.allocate(nnzub);
-    //std::cout << TAG_INFO << "Preallocated Hamiltonian with nnzub = " << nnzub << "\n";
+    if (VERBOSE >= 2) {
+        std::cout << TAG_INFO << "Preallocated Hamiltonian with nnzub = " << nnzub << "\n";
+    }
     
     // 2. Build the Hamiltonian row per row:
     for (int i = 0; i < npoint; i++) {//Loop over the points of the mesh.
@@ -591,15 +613,16 @@ void WaveSystem::computeHamiltonian() {
     // 3. Finalize the sparse Hamiltonian (sort the matrix elements in column-major ordering):
     hamiltonian.finalize();
     
-    // Print some warnings:
-    if (hamiltonian.getNnz() > nnzub) {
-        std::cout << TAG_WARN << "Insufficient matrix preallocation. Added nnz=" << hamiltonian.getNnz() 
-                  << " elements, but allocated only nnzub=" << nnzub << ".\n";
+    if (VERBOSE >= 1) {
+        // Print some warnings:
+        if (hamiltonian.getNnz() > nnzub) {
+            std::cout << TAG_WARN << "Insufficient matrix preallocation. Added nnz=" << hamiltonian.getNnz() 
+                    << " elements, but allocated only nnzub=" << nnzub << ".\n";
+        }
+        // Measure the build time for information:
+        double ctime_build = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_build).count();
+        std::cout << "Done in " << ctime_build << " s.\n";
     }
-    
-    // Measure the build time for information:
-    double ctime_build = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_build).count();
-    std::cout << "Done in " << ctime_build << " s.\n";
 }
 
 /**
@@ -701,7 +724,9 @@ int WaveSystem::computeNOutputProp() const {
  * Compute the input and output matrices containing the input and output modes.
  */
 void WaveSystem::computeIOStates() {
-    std::cout << TAG_INFO << "Building the input/output states... ";
+    if (VERBOSE >= 1) {
+        std::cout << TAG_INFO << "Building the input/output states... ";
+    }
     const auto start_build = std::chrono::steady_clock::now(); // Gets the current time.
     
     // Construct the input/output modes :
@@ -766,14 +791,6 @@ void WaveSystem::computeIOStates() {
     inputState.finalize();
     outputState.finalize();
     
-    // Print some warnings:
-    if (jinput != ninputprop) {
-        std::cout << TAG_WARN << "Computed jinput=" << jinput << " input states, but planned ninputprop=" << ninputprop << ".\n";
-    }
-    if (joutput != noutputprop) {
-        std::cout << TAG_WARN << "Computed joutput=" << joutput << " output states, but planned noutputprop=" << noutputprop << ".\n";
-    }
-    
     // Normalize the density of states:
     dosinput  /= 2*PI*ninput;  // Note that it is the total number of input/output modes (including evanescent modes).
     dosoutput /= 2*PI*noutput;
@@ -782,16 +799,26 @@ void WaveSystem::computeIOStates() {
     const double mkh = 1. - kh*kh/4.;
     doslattice = ellipticK(1. - 1./(mkh*mkh))/(2.*PI*PI*mkh);
     
-    if (std::abs(dosinput - doslattice) > 0.05*doslattice) {// Tolerance of 5% on the DOS.
-        std::cout << TAG_WARN << "DOSinput=" << dosinput << " is different from DOSlattice=" << doslattice << ", meaning that an input lead resonates (inputKlh.real.min=" << inputKlh.real().min() << "). You may consider changing the wavenumber...\n";
+    if (VERBOSE >= 1) {
+        
+        // Print some warnings:
+        if (jinput != ninputprop) {
+            std::cout << TAG_WARN << "Computed jinput=" << jinput << " input states, but planned ninputprop=" << ninputprop << ".\n";
+        }
+        if (joutput != noutputprop) {
+            std::cout << TAG_WARN << "Computed joutput=" << joutput << " output states, but planned noutputprop=" << noutputprop << ".\n";
+        }
+        if (std::abs(dosinput - doslattice) > 0.05*doslattice) {// Tolerance of 5% on the DOS.
+            std::cout << TAG_WARN << "DOSinput=" << dosinput << " is different from DOSlattice=" << doslattice << ", meaning that an input lead resonates (inputKlh.real.min=" << inputKlh.real().min() << "). You may consider changing the wavenumber...\n";
+        }
+        if (std::abs(dosoutput - doslattice) > 0.05*doslattice) {// Tolerance of 5% on the DOS.
+            std::cout << TAG_WARN << "DOSoutput=" << dosoutput << " is different from DOSlattice=" << doslattice << ", meaning that an output lead resonates (outputKlh.real.min=" << outputKlh.real().min() << "). You may consider changing the wavenumber...\n";
+        }
+        
+        // Measure the build time for information:
+        double ctime_build = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_build).count();
+        std::cout << "Done in " << ctime_build << " s.\n";
     }
-    if (std::abs(dosoutput - doslattice) > 0.05*doslattice) {// Tolerance of 5% on the DOS.
-        std::cout << TAG_WARN << "DOSoutput=" << dosoutput << " is different from DOSlattice=" << doslattice << ", meaning that an output lead resonates (outputKlh.real.min=" << outputKlh.real().min() << "). You may consider changing the wavenumber...\n";
-    }
-    
-    // Measure the build time for information:
-    double ctime_build = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_build).count();
-    std::cout << "Done in " << ctime_build << " s.\n";
 }
 
 /**
@@ -801,13 +828,28 @@ void WaveSystem::computeIOStates() {
  */
 void WaveSystem::computeGreenFunction() {
     if (not computed) {// This function only does the computation if the flag "computed" is "false".
-        //std::cout << TAG_INFO << "Solving the sparse system now..." << std::endl;
+        
+        if (VERBOSE >= 2) {
+            std::cout << TAG_INFO << "Solving the sparse system now... ";
+        }
+        const auto start_solve = std::chrono::steady_clock::now(); // Gets the current time.
+        
+        /**
+         * Solve the system using UMFPACK (no parallelization, no iterative refinement).
+         */
         solveUmfpack(hamiltonian, inputState, green);
-            // Solve the system using UMFPACK (no parallelization, no iterative refinement).
+            
+        /**
+         * Solve the system using MUMPS sequentially (MPI disabled, no iterative refinement).
+         * Note that MUMPS is faster than UMFPACK but uses more memory.
+         */
         //solveMumps(hamiltonian, inputState, green);
-            // Solve the system using MUMPS sequentially (MPI disabled, no iterative refinement).
-            // Note that MUMPS is faster than UMFPACK but uses more memory.
-        computed = true;  // Declare the Green function as computed.
+        
+        if (VERBOSE >= 2) {
+            double ctime_solve = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - start_solve).count();
+            std::cout << "Done in " << ctime_solve << " s.\n";
+        }
+        computed = true;  // Declare the Green function as computed (avoids further recomputing).
     }
 }
 
@@ -869,7 +911,9 @@ void WaveSystem::checkResidual() {
     
     computeGreenFunction();  // Ensure that the Green function has been computed (this does nothing if it is so).
     
-    std::cout << TAG_INFO << "Computing the residual...\n";
+    if (VERBOSE >= 1) {
+        std::cout << TAG_INFO << "Computing the residual...\n";
+    }
     const ComplexMatrix inputState_product = hamiltonian * green; // Recompute the input state from the solution of the linear system.
     
     // Compare the matrices elementwise:
@@ -917,6 +961,23 @@ void WaveSystem::checkUnitarity(const bool showtval) {
         }
         tval.transpose().print("Tval");
         std::cout << TAG_INFO << "Tavg = " << tval.mean() << "\n";
+    }
+}
+
+/**
+ * Add the transmission eigenvalues corresponding to the current settings of the WaveSystem to the given vector.
+ */
+void WaveSystem::addTSpectrum(std::vector<double>& tval) {
+    
+    const int ntval = std::min(ninputprop, noutputprop); // Expected maximum number of transmission eigenstates.
+    ComplexMatrix tmat(noutputprop, ninputprop), u(noutputprop, noutputprop), vh(ninputprop, ninputprop);
+    RealMatrix s(ntval, 1);
+    
+    transmissionMatrix(tmat);  // Compute the transmisison matrix.
+    svd(tmat, s, u, vh);  // Compute the SVD of the transmission matrix. t = U S V^H  -->  t^H t = V S^2 V^H
+    
+    for (int i = 0; i < ntval; i++) {// Loop on all transmission eigenvalues.
+        tval.push_back(s(i, 0) * s(i, 0)); // Transmission eigenvalues are the square of the singular values of the transmission matrix.
     }
 }
 

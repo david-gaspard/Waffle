@@ -5,5 +5,7 @@
 
 export OPENBLAS_NUM_THREADS=1
 
-./waffle
+##./waffle
+
+./cavity
 

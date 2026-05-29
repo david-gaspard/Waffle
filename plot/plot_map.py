@@ -2,7 +2,7 @@
 #-*- coding: utf-8 -*-
 ## Created on 2025-07-17 at 12:48:24 CEST by David Gaspard (ORCID 0000-0002-4449-8782) <david.gaspard@espci.fr> under the MIT License.
 ## Python script to plot a scalar field defined over a square lattice with holes. The input data must have the form [x, y, f(x, y)].
-import sys, os, datetime, csv
+import sys, os, argparse, datetime, csv
 import numpy as np
 import matplotlib.pyplot as mplt
 import matplotlib.colors as mcol
@@ -107,9 +107,8 @@ def array_from_file(field_file, column_name):
     """
     try:
         fp = open(field_file, 'r')
-    except IOError as e:
-        print(ct.TAG_ERROR + "Field file '" + field_file + "' not found, aborting now...")
-        return 1
+    except IOError as exc:
+        raise IOError("Failed to open field file '" + field_file + "'.") from exc
     
     data = list(csv.DictReader((line for line in fp if not line.startswith('%')), skipinitialspace=True))
     data_header = ct.get_header(fp, '%')
@@ -138,7 +137,7 @@ def array_from_file(field_file, column_name):
     return (array, xmin, xmax, ymin, ymax, data, data_header)
 
 
-def array_to_tikz(array, xmin, xmax, ymin, ymax, vmin, vmax, unit_length, data, data_header, mode, args, file_path):
+def array_to_tikz(array, xmin, xmax, ymin, ymax, vmin, vmax, data, data_header, args, file_path):
     """
     Create a bitmap and a TikZ file importing this bitmap to plot the data.
     This function calls an external script to compile the TikZ file.
@@ -189,16 +188,16 @@ def array_to_tikz(array, xmin, xmax, ymin, ymax, vmin, vmax, unit_length, data, 
 \\end{{axis}}%
 \end{{tikzpicture}}%""".format(#
         timestamp = datetime.datetime.now().astimezone().strftime("%F at %T %z"),
-        my_program = args[0],
+        my_program = sys.argv[0],
         my_copyright = ct.MY_COPYRIGHT,
         data_header = data_header,
-        title = "\\textbf{Cmd:} \\detokenize{"+ " ".join(args) + "}",
+        title = "\\textbf{Cmd:} \\detokenize{"+ " ".join(sys.argv) + "}",
         xlabel = "$x/\\ell$",
         ylabel = "$y/\\ell$",
-        unit_length = unit_length,
-        colorbar_string = colormap_to_tikz_code(cmap, 41, mode),
+        unit_length = args.unit,
+        colorbar_string = colormap_to_tikz_code(cmap, 41, args.mode),
         boundary_style = plot_mesh.BOUNDARY_STYLE,
-        boundary_code = plot_mesh.boundary_to_tikz_code(data),
+        boundary_code = plot_mesh.boundary_to_tikz_code(data, args.epsilon),
         vmin   = vmin,
         vmax   = vmax,
         xmin   = xmin-0.5,
@@ -221,51 +220,67 @@ def plot_map(args):
     Plots the given component args[1]='column_name' of the given CSV file args[2]='field_file'.
     The data in the field file are assumed to have the form [x, y, north, south, east, west, f1, f2, ..., fn], where the components 'x' and 'y' are assumed to be integers, and the cardinal directions are the indices of nearest neighbors or boundary conditions.
     """
-    ## Check if the number of arguments is correct:
-    if (len(args) != 6):
-        print(ct.TAG_ERROR + "Invalid number of arguments, doing nothing...")
-        print(ct.TAG_USAGE + args[0] + " MODE(lin|log) COLUMN_NAME UNIT_LENGTH VRANGE(auto|vmin:vmax) FIELD_FILE")
-        return 1
-    
-    mode = args[1]  ## Coloring mode ("lin" or "log").
-    column_name = args[2]  ## Column in the field file.
-    unit_length = float(eval(args[3]))  ## Unit length, typically the best estimate of h/lscat = (L/lscat)/(L/h).
-    vrange = args[4]  ## Value range. Either "vmin:vmax" or "auto".
-    field_file  = args[5]  ## File containing the field.
-    file_path = os.path.splitext(field_file)[0] + "_" + column_name  ## The file path will be used to write new files.
-    
     ## Check for possible invalid arguments:
     available_modes = ["lin", "log", "asinh", "sqrt"]
-    if (mode not in available_modes):
-        print(ct.TAG_ERROR + "Invalid scale mode '" + mode + "', expected in " + str(available_modes) + ", aborting...")
+    if (args.mode not in available_modes):
+        print(ct.TAG_ERROR + "Invalid scale mode '" + args.mode + "', expected in " + str(available_modes) + ", aborting...")
         return 1
     
-    if (unit_length <= 0.):
-        unit_length = 1.
+    if (args.unit <= 0.):
+        print(ct.TAG_ERROR + "Unit length cannot be negative or zero (received " + args.unit + "), aborting...")
+        return 1
     
     ## Extract the array to plot from the data file:
-    (array, xmin, xmax, ymin, ymax, data, data_header) = array_from_file(field_file, column_name)
+    try:
+        (array, xmin, xmax, ymin, ymax, data, data_header) = array_from_file(args.field_file, args.column_name)
+    except IOError as exc:
+        print(ct.TAG_ERROR + "Field file '" + args.field_file + "' not found, aborting now...")
+        return 1
     
-    if (mode == "log"):
+    if (args.mode == "log"):
         array = np.log10(array)
-    elif (mode == "asinh"):
+    elif (args.mode == "asinh"):
         array = np.arcsinh(array)
-    elif (mode == "sqrt"):
+    elif (args.mode == "sqrt"):
         array = np.sqrt(array)
     
     ## Find the bounds (vmin, vmax) of the charted function:
-    if (vrange == "auto"):
+    if (args.vrange == "auto"):
         vmin = array.min() ## If "auto" mode, then extract the depth range of the field [vmin, vmax].
         vmax = array.max()
-    elif (":" in vrange):
-        vmin, vmax = sorted(list(map(eval, vrange.split(":"))))
+    elif (":" in args.vrange):
+        vmin, vmax = sorted(list(map(float, args.vrange.split(":"))))
     else:
-        print(ct.TAG_ERROR + "Invalid value range, expected 'auto' or vmin:vmax (separated by colon), aborting...")
+        print(ct.TAG_ERROR + "Invalid value range, expected 'auto' or 'vmin:vmax' (separated by colon), aborting...")
         return 1
     
     ## Plot the array using a bitmap imported in TikZ:
-    array_to_tikz(array, xmin, xmax, ymin, ymax, vmin, vmax, unit_length, data, data_header, mode, args, file_path)
+    file_path = os.path.splitext(args.field_file)[0] + "_" + args.column_name  ## The file path will be used to write new files.
+    array_to_tikz(array, xmin, xmax, ymin, ymax, vmin, vmax, data, data_header, args, file_path)
     return 0
 
+def parseArguments():
+    """
+    Parse the arguments of the program.
+    """
+    parser = argparse.ArgumentParser()  ## Create argument parser.
+    
+    ## Positional mandatory arguments:
+    parser.add_argument("column_name", type=str, help="Name of the field to be plotted.")
+    parser.add_argument("field_file",  type=str, help="Full file path of the field file.")
+    
+    ## Optional arguments:
+    parser.add_argument("-m", "--mode", type=str, default="lin",
+        help="Scale mode, either 'lin', 'log', 'asinh', or 'sqrt'.")
+    parser.add_argument("-u", "--unit", type=float, default=1.,
+        help="Unit length. Two common choices are either the value of 'h/lscat' or 'kh'.")
+    parser.add_argument("-v", "--vrange", type=str, default="auto",
+        help="Range of values of the map. Either 'auto' or 'vmin:vmax'.")
+    parser.add_argument("-e", "--epsilon", type=float, default=1.3,
+        help="Tolerance of the Ramer-Douglas-Peucker algorithm. Larger is simpler (eps=0 to disable).")
+    
+    return parser.parse_args() ## Return the parsed arguments.
+
 if (__name__ == '__main__'):
-    exit(plot_map(sys.argv))
+    args = parseArguments()  ## Parse the arguments
+    exit(plot_map(args))

@@ -16,12 +16,15 @@ LIBS=-lopenblas -lumfpack -lpng $(MUMPS_LIBS)
 ## BUILD MAIN PROGRAM
 ##########################
 PROGNAME = waffle
-SRCLIST = $(shell find src/ -name "*.cpp" ! -name "Main.cpp")
+SRCLIST = $(shell find src/ -name "*.cpp" ! -name "Main*.cpp")
 BINLIST = $(SRCLIST:src/%.cpp=bin/%.o)
 
 all: directories $(PROGNAME)
 
 $(PROGNAME): $(BINLIST) src/Main.cpp
+	$(CC) $(CFLAGS) $^ $(LIBS) -o $@
+
+cavity: $(BINLIST) src/MainCavity.cpp
 	$(CC) $(CFLAGS) $^ $(LIBS) -o $@
 
 bin/%.o: src/%.cpp 

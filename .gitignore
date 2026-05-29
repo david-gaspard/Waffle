@@ -7,6 +7,7 @@ plot/__pycache__/
 
 ## Ignore binary files ##
 waffle
+cavity
 *.test
 *.pdf
 *.jpg

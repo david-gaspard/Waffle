@@ -1212,15 +1212,16 @@ int main(int argc, char** argv) {
     
     // Checking operations:
     //ctx.sys.setDisorder(1); // Uncomment this line to insert disorder inside the medium.
-    //ctx.sys.plotMesh();
-    //ctx.sys.plotMatrixHamiltonian();
-    //ctx.sys.plotMatrixInputState();
-    //ctx.sys.plotMatrixOutputState();
-    //ctx.sys.plotGreenFunction();
-    //ctx.sys.plotInputModes(20); // Compute the lowest waveguide modes.
-    //ctx.sys.plotTransmissionStates(10); // Compute the lowest transmission eigenstates.
-    //ctx.sys.checkResidual();
-    //ctx.sys.checkUnitarity(true);
+    //ctx.sys.plotMesh(); // Plot the mesh.
+    //ctx.sys.plotMatrixHamiltonian(); // Plot the Hamiltonian matrix as a raster image.
+    //ctx.sys.plotMatrixInputState(); // Plot the input state matrix as a raster image.
+    //ctx.sys.plotMatrixOutputState(); // Plot the output state matrix as a raster image.
+    //ctx.sys.plotGreenFunction(); // Plot all the modal components of the Green function.
+    //ctx.sys.plotInputModes(20); // Plot the lowest waveguide modes.
+    //ctx.sys.plotTransmissionStates(10); // Plot the lowest transmission eigenstates.
+    //ctx.sys.checkResidual(); // Check the residual of the solver.
+    //ctx.sys.checkUnitarity(true); // Check the unitarity of the propagation (makes sense only for no absorption).
+    
     
     const int nseed = 250;   // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
     const int seed0 = 1;     // First seed used to generate realizations of the disorder. Actual seed = [seed0, seed0 + 1, ..., seed0 + nseed - 1]. 
