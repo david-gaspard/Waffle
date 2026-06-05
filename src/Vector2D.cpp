@@ -6,6 +6,7 @@
  ***/
 #include "Vector2D.hpp"
 #include <cmath>
+#include <random>
 
 /**
  * Constructor of the Vector2D object.
@@ -71,39 +72,6 @@ double Vector2D::cross(const Vector2D& v) const {
 }
 
 /**
- * Compute the bounds of a polygon. std::vector will return an out of bound error if the polygon vector is empty.
- */
-void polygonBounds(const std::vector<Vector2D>& polygon, int& xmin, int& xmax, int& ymin, int& ymax) {
-    
-    double px, py;
-    int fpx, cpx, fpy, cpy;
-    
-    px = polygon.at(0).x;  // Extract the (x, y) coordinates of the first vertex.
-    py = polygon.at(0).y;  // Note: std::vector will return an out of bound error if the polygon vector is empty.
-    
-    xmin = (int) std::floor(px);  // Initialize the minima and maxima.
-    xmax = (int)  std::ceil(px);
-    ymin = (int) std::floor(py);
-    ymax = (int)  std::ceil(py);
-    
-    for (unsigned int i = 1; i < polygon.size(); i++) {// Loop on the vertices of the polygon.
-        
-        px = polygon.at(i).x;  // Extract the (x, y) coordinates of the current vertex.
-        py = polygon.at(i).y;
-        
-        fpx = (int) std::floor(px);
-        cpx = (int)  std::ceil(px);
-        fpy = (int) std::floor(py);
-        cpy = (int)  std::ceil(py);
-        
-        if (fpx < xmin) xmin = fpx;
-        if (cpx > xmax) xmax = cpx;
-        if (fpy < ymin) ymin = fpy;
-        if (cpy > ymax) ymax = cpy;
-    }
-}
-
-/**
  * Returns the oriented winding number of the given polygon with respect to the present point Vector2D.
  * The winding number is the number of turns the polygon does around a point. It is positive for counterclockwise direction, and negative otherwise.
  * 
@@ -150,3 +118,100 @@ std::ostream& operator<<(std::ostream& os, const Vector2D& v) {
     os << "(" << v.x << ", " << v.y << ")";
     return os;
 }
+
+/**
+ * Compute the bounds of a polygon. std::vector will return an out of bound error if the polygon vector is empty.
+ */
+void polygonBounds(const std::vector<Vector2D>& polygon, int& xmin, int& xmax, int& ymin, int& ymax) {
+    
+    double px, py;
+    int fpx, cpx, fpy, cpy;
+    
+    px = polygon.at(0).x;  // Extract the (x, y) coordinates of the first vertex.
+    py = polygon.at(0).y;  // Note: std::vector will return an out of bound error if the polygon vector is empty.
+    
+    xmin = (int) std::floor(px);  // Initialize the minima and maxima.
+    xmax = (int)  std::ceil(px);
+    ymin = (int) std::floor(py);
+    ymax = (int)  std::ceil(py);
+    
+    for (uint i = 1; i < polygon.size(); i++) {// Loop on the vertices of the polygon.
+        
+        px = polygon.at(i).x;  // Extract the (x, y) coordinates of the current vertex.
+        py = polygon.at(i).y;
+        
+        fpx = (int) std::floor(px);
+        cpx = (int)  std::ceil(px);
+        fpy = (int) std::floor(py);
+        cpy = (int)  std::ceil(py);
+        
+        if (fpx < xmin) xmin = fpx;
+        if (cpx > xmax) xmax = cpx;
+        if (fpy < ymin) ymin = fpy;
+        if (cpy > ymax) ymax = cpy;
+    }
+}
+
+/**
+ * Generate a list of positions of random non-overlapping disks of given "radius" in the rectangle xmin, xmax, ymin, ymax, using the given "seed".
+ * The positions avoid the edges of the rectangle.
+ */
+std::vector<Vector2D> nonOverlappingDisks(const int ndisk, const double radius,
+        const double xmin, const double xmax, const double ymin, const double ymax, const uint64_t seed) {
+    
+    // 1. Check for possible errors:
+    if (ndisk < 0) {
+        throw std::invalid_argument("In nonOverlappingDisks(): Invalid number of disks, cannot be negative.");
+    }
+    else if (radius < 0.) {
+        throw std::invalid_argument("In nonOverlappingDisks(): Invalid disk radius, cannot be negative.");
+    }
+    else if (xmax <= xmin || ymax <= ymin) {
+        throw std::invalid_argument("In nonOverlappingDisks(): Invalid rectangular bounds, xmax <= xmin or ymax <= ymin.");
+    }
+    
+    const double pfrac = PI/(6.*std::sqrt(3.));  // Minimum packing fraction leading to congestion (about 30%).
+    const double surf = std::max(xmax - xmin - 2.*radius, 0.) * std::max(ymax - ymin - 2.*radius, 0.);  // Available surface.
+    const int ndisk_max = static_cast<int>(std::floor(surf*pfrac/(PI*radius*radius)));
+    if (ndisk > ndisk_max && ndisk_max > 0) {// Check if the number of disk is not too large, and if the maximum ndisk_max is correct.
+        std::string msg = "In nonOverlappingDisks(): Number of disks (ndisk=" + std::to_string(ndisk) + ") is too large, maximum is " 
+            + std::to_string(ndisk_max) + " (max packing is " + std::to_string(100.*pfrac) + "%).";
+        throw std::invalid_argument(msg);
+    }
+    
+    // 2. Prepare the random generators:
+    std::mt19937_64 rng;  // Instantiate the standard Mersenne Twister random number generator (64-bit-return version).
+    rng.seed(seed);       // Initialize the random generator with the given seed.
+    std::uniform_real_distribution<double> random_uniform_x(xmin + radius, xmax - radius);  // Avoid the edges.
+    std::uniform_real_distribution<double> random_uniform_y(ymin + radius, ymax - radius);
+    
+    double x, y, dx, dy;
+    bool valid;
+    std::vector<Vector2D> poslist;
+    
+    for (int i = 0; i < ndisk; i++) {// Loop over the disks to add.
+        
+        do {// Loop over trials.
+            x = random_uniform_x(rng);  // Generate a random position uniformly in the allowed rectangle.
+            y = random_uniform_y(rng);
+            
+            // Check if the disk does not overlap another disk:
+            valid = true;
+            for (uint j = 0 ; j < poslist.size(); j++) {
+                dx = x - poslist.at(j).x;
+                dy = y - poslist.at(j).y;
+                if (dx*dx + dy*dy < 4*radius*radius) {// Overlap detected.
+                    valid = false;
+                    break;
+                }
+            }
+            
+        } while (not valid);
+        
+        poslist.push_back(Vector2D(x, y)); // Save the disk to check the overlaps.
+    }
+    
+    return poslist;
+}
+
+

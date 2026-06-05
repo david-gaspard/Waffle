@@ -93,7 +93,7 @@ class WaveSystem {
     void SBlockMatrix(const std::vector<int>& index, ComplexMatrix& smat);
     void checkUnitarity(const bool showtval);
     void checkResidual();
-    void addTSpectrum(std::vector<double>& tval);
+    void addTSpectrum(RealMatrix& tval);
     void addITransmission(const RealMatrix& trange, RealMatrix& tprofile, RealMatrix& nsample, RealMatrix& tval);
     void addITmax(RealMatrix& itmax, double& tmax);
     void addIIsotropic(RealMatrix& iavg);

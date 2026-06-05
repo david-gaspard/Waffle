@@ -138,4 +138,3 @@ double ellipticK(const double m) {
     
     return PI/(2.*a);
 }
-

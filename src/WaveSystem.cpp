@@ -357,7 +357,13 @@ void WaveSystem::plotIntensity(const RealMatrix& intensity, const std::string& d
     ofs.close();  // Close the stream before calling an external script (this may cause I/O trouble).
     
     // Plot the I0 state:
-    std::string cmd = "plot/plot_map.py -u " + std::to_string(holscat) +  " I0 " + filename;
+    std::string cmd;
+    if (holscat == 0.) {
+        cmd = "plot/plot_map.py I0 " + filename;
+    }
+    else {
+        cmd = "plot/plot_map.py -u " + std::to_string(holscat) +  " I0 " + filename;
+    }
     if (VERBOSE >= 1) {
         std::cout << TAG_EXEC << cmd << "\n";
     }
@@ -698,7 +704,7 @@ int WaveSystem::computeNInputProp() const {
 }
 
 /**
- * Computes and return the number of input propagating modes.
+ * Computes and return the number of output propagating modes.
  */
 int WaveSystem::computeNOutputProp() const {
     
@@ -967,17 +973,24 @@ void WaveSystem::checkUnitarity(const bool showtval) {
 /**
  * Add the transmission eigenvalues corresponding to the current settings of the WaveSystem to the given vector.
  */
-void WaveSystem::addTSpectrum(std::vector<double>& tval) {
+void WaveSystem::addTSpectrum(RealMatrix& tval) {
     
+    // 1. First check for possible errors:
     const int ntval = std::min(ninputprop, noutputprop); // Expected maximum number of transmission eigenstates.
-    ComplexMatrix tmat(noutputprop, ninputprop), u(noutputprop, noutputprop), vh(ninputprop, ninputprop);
-    RealMatrix s(ntval, 1);
+    if (tval.getNrow() != ntval || tval.getNcol() != 1) {
+        std::string msg = "In addTSpectrum(): Invalid size of 'tval'. Received ("
+                        + std::to_string(tval.getNrow()) + ", " + std::to_string(tval.getNcol()) + "), expected ("
+                        + std::to_string(ntval) + ", 1) as Ninputprop=" + std::to_string(ninputprop) + " and Noutputprop=" + std::to_string(noutputprop) + ".";
+        throw std::invalid_argument(msg);
+    }
     
-    transmissionMatrix(tmat);  // Compute the transmisison matrix.
-    svd(tmat, s, u, vh);  // Compute the SVD of the transmission matrix. t = U S V^H  -->  t^H t = V S^2 V^H
+    // 2. Compute the transmission matrix and transmission eigenvalues:
+    ComplexMatrix tmat(noutputprop, ninputprop), u(noutputprop, noutputprop), vh(ninputprop, ninputprop);
+    transmissionMatrix(tmat);  // Compute the transmission matrix.
+    svd(tmat, tval, u, vh);  // Compute the SVD of the transmission matrix. t = U S V^H  -->  t^H t = V S^2 V^H
     
     for (int i = 0; i < ntval; i++) {// Loop on all transmission eigenvalues.
-        tval.push_back(s(i, 0) * s(i, 0)); // Transmission eigenvalues are the square of the singular values of the transmission matrix.
+        tval(i, 0) = tval(i, 0) * tval(i, 0); // Transmission eigenvalues are the square of the singular values of the transmission matrix.
     }
 }
 

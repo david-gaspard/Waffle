@@ -33,9 +33,10 @@ struct Vector2D {
     double cross(const Vector2D& v) const;
     int windingNumber(const std::vector<Vector2D>& polygon) const;
     
-    friend void polygonBounds(const std::vector<Vector2D>& polygon, int& xmin, int& xmax, int& ymin, int& ymax);
-    friend std::ostream& operator<<(std::ostream& os, const Vector2D& v);
-    
 };
+
+std::ostream& operator<<(std::ostream& os, const Vector2D& v);
+void polygonBounds(const std::vector<Vector2D>& polygon, int& xmin, int& xmax, int& ymin, int& ymax);
+std::vector<Vector2D> nonOverlappingDisks(const int ndisk, const double radius, const double xmin, const double xmax, const double ymin, const double ymax, const uint64_t seed);
 
 #endif

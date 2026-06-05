@@ -275,6 +275,8 @@ void SquareMesh::removeRectangle(int xmin, int xmax, int ymin, int ymax) {
         [xmin, xmax, ymin, ymax](MeshPoint p) { 
             return  xmin <= p.x && p.x <= xmax && ymin <= p.y && p.y <= ymax; 
         }), point.end());
+    
+    ready = false;  // If the mesh is changed, then the neighbors must be recomputed.
 }
 
 /**
@@ -286,6 +288,8 @@ void SquareMesh::removeDisk(const double x0, const double y0, const double radiu
         [x0, y0, radius](MeshPoint p) {
             return (p.x-x0)*(p.x-x0) + (p.y-y0)*(p.y-y0) <= radius*radius;
         }), point.end());
+    
+    ready = false;  // If the mesh is changed, then the neighbors must be recomputed.
 }
 
 /**
@@ -297,6 +301,8 @@ void SquareMesh::removePolygon(const std::vector<Vector2D>& polygon) {
         [polygon](MeshPoint p) {
             return Vector2D(p).windingNumber(polygon) % 2 != 0;
         }), point.end());
+    
+    ready = false;  // If the mesh is changed, then the neighbors must be recomputed.
 }
 
 /**
