@@ -135,30 +135,31 @@ int main(int argc, char** argv) {
     const double width       = 0.252;       // With of the cavity (in meters). Default=0.252 m.
     const int nscat          = 0;           // Number of scatterers. Typically: 10, 20, 50, 100, and so on.
     const double rscat       = 0.;          // Radius of the metallic scatterers (in meters). Default=0.0031 m. Zero gives single-pixel scatterers.
-    const double dscat       = 0.5;         // Scattering depth, L/l_scat, of continuous Dirac-delta disorder (if present). Zero to disable.
+    const double dscat       = 0.;          // Scattering depth, L/l_scat, of continuous Dirac-delta disorder (if present). Zero to disable.
     const double freqabso    = 0.;          // Absorption frequency (in Hz). Default=1.5e6 Hz for rscat=3.1e-3, and 7.0e6 Hz for rscat=1e-3.
     
     const int ncoaxin        = 8;           // Number of input coaxes.
     const double apercoaxin  = 1./15;       // Aperture of input coaxes (in fraction of the width). Typically, 1/15 when ncoaxin=8, and 3/8 when coaxin=1.
-    
     //const int ncoaxin        = 1;           // Number of input coaxes.
-    //const double apercoaxin  = 3./8;      // Aperture of input coaxes (in fraction of the width). Typically, 1/15 when ncoaxin=8, and 3/8 when coaxin=1.
+    //const double apercoaxin  = 3./8;        // Aperture of input coaxes (in fraction of the width). Typically, 1/15 when ncoaxin=8, and 3/8 when coaxin=1.
+    const double reflcoaxin  = 0.04;        // Reflection probability of the input coax barrier.
     
     const int ncoaxout       = ncoaxin;     // Number of output coax cables.
     const double apercoaxout = apercoaxin;  // Aperture of output coax cables (in fraction of the width).
+    const double reflcoaxout = reflcoaxin;  // Reflection probability of the output coax barrier.
     
     const double h           = 5.e-4;       // Size of the step used in the space discretization (in meters). Default=5.0e-4 m.
     const int nthread        = 10;          // Number of independent computation threads used in the parallelization.
     
     const CavityParameters param = {
-        .nseed = 5000,       // Number of realizations of the disorder.
+        .nseed = 20,         // Number of realizations of the disorder.
         .nfreq = 1,          // Number of frequencies in the frequency range. Nfreq=1 selects the center of the interval.
         .freqmin = 12.0e9,   // Minimum field frequency of the frequency range (in Hz). Default=12.0e9 Hz.
         .freqmax = 15.0e9    // Minimum field frequency of the frequency range (in Hz). Default=15.0e9 Hz.
     };
     
-    CavityBare cavity(param, length, width, nscat, rscat, dscat, freqabso, h); // Create a bare cavity with circular scatterers.
-    //CavityCoax cavity(param, length, width, ncoaxin, apercoaxin, ncoaxout, apercoaxout, nscat, rscat, freqabso, h); // Create a cavity with coax guides.
+    //CavityBare cavity(param, length, width, nscat, rscat, dscat, freqabso, h); // Create a bare cavity with circular scatterers.
+    //CavityCoax cavity(param, length, width, ncoaxin, apercoaxin, reflcoaxin, ncoaxout, apercoaxout, reflcoaxout, nscat, rscat, freqabso, h); // Create a cavity with coax guides.
     
     cavity.printSummary(); // Print the summary of the cavity parameters.
     

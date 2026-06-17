@@ -131,7 +131,7 @@ int SquareMesh::getNOpening() const {
 
 /**
  * Return the index of a given point in the mesh.
- * If the point does not exist, then return BND_DEFAULT (a negative value).
+ * If the point does not exist, then return -1.
  */
 int SquareMesh::indexOf(const int x, const int y) const {
     auto ptr = std::lower_bound(point.begin(), point.end(), MeshPoint(x, y, BND_MIRROR), comparePoints);

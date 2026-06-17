@@ -32,8 +32,9 @@ WaveSystem createTestSystem() {
     double kh = PI/2;
     double holscat = 0.1;
     double holabso = 0.;
+    double density = 1.;
     
-    WaveSystem sys("TestHamiltonian", mesh, kh, holscat, holabso);
+    WaveSystem sys("TestHamiltonian", mesh, kh, density, holscat, holabso);
     
     return sys;
 }
@@ -47,9 +48,9 @@ int testHamiltonian() {
     WaveSystem sys = createTestSystem();
     
     sys.infoHamiltonian();  // Summary of the Hamiltonian to stdout.
-    sys.plotHamiltonian();  // Plot the Hamiltonian matrix to an image file.
-    sys.plotInputState();   // Plot the input state matrix to an image file.
-    sys.plotOutputState();  // Plot the output state matrix to a file.
+    sys.plotMatrixHamiltonian();  // Plot the Hamiltonian matrix to an image file.
+    sys.plotMatrixInputState();   // Plot the input state matrix to an image file.
+    sys.plotMatrixOutputState();  // Plot the output state matrix to a file.
     sys.plotMesh();         // Plot the mesh for checking.
     
     return 0;
@@ -78,8 +79,9 @@ WaveSystem createUnitarySystem() {
     double kh = PI/2;
     double holscat = 0.05;
     double holabso = 0.;  // Absorption is zero.
+    double density = 1.;
     
-    WaveSystem sys("TestUnitarity", mesh, kh, holscat, holabso);
+    WaveSystem sys("TestUnitarity", mesh, kh, density, holscat, holabso);
     
     return sys;
 }
@@ -107,14 +109,72 @@ int testUnitarity() {
     
     return 0;
 }
+
+/**
+ * Test the creation of reflective outputs using additional potential.
+ */
+int testReflectiveBarrier() {
+    std::cout << "====== TEST REFLECTIVE BARRIER ======\n";
     
+    SquareMesh mesh; // Declare the mesh.
+    
+    // Parameters of the mesh:
+    const int nx = 160;
+    const int ny = 100;
+    const int xbar = nx;      // Position of the barrier.
+    const double nprop = 1.5;   // Number of propagating modes, Nprop = kW/pi.
+    const double kh = PI*nprop/ny;  // Value of k*h, deduced from Nprop: Nprop = kh*ny/pi.
+    const double rbar = 0.04;   // Reflection probability of the barrier.
+    const double holscat = 0.;  // Disorder strength, value of h/lscat.
+    const double holabso = 0.;  // Absorption strength, value of h/labso.
+    const double density = 1.;  // Density of the disorder.
+    const std::string sysname = "test-barrier"; // Name of the system.
+    
+    // Setup the mesh from geometry:
+    mesh.addRectangle(1, nx, 1, ny, BND_MIRROR);
+    mesh.setBoundaryRectangle(1, 1, 1, ny, DIR_WEST, BND_INPUT);
+    mesh.setBoundaryRectangle(nx, nx, 1, ny, DIR_EAST, BND_OUTPUT);
+    mesh.finalize();
+    
+    WaveSystem sys(sysname, mesh, kh, density, holscat, holabso);
+    
+    // Setup the reflective barrier:
+    const int ninputprop = sys.getNInputProp();
+    const double d2pkh2 = laplacianEigenvalue(0, ny) + kh*kh;  // Eigenvalue of D_y^2 + (kh)^2 for the fundamental mode.
+    const double sinklh = std::sqrt( d2pkh2 * ( 1. - d2pkh2/4. ) );    // Compute sin(K_x).
+    const dcomplex uh2 = 2. * std::sqrt(rbar/(1.-rbar)) * sinklh;    // Value U(x)*h^2 of the potential barrier.
+    
+    for (int y = 1; y <= ny; y++) {// Loop on the points to add to the potential barrier.
+        sys.addPotential(xbar, y, uh2);
+    }
+    
+    sys.infoHamiltonian();    
+    sys.checkUnitarity(false);
+    
+    // Compute reflection eigenvalues:
+    const int nrval = ninputprop;
+    ComplexMatrix rmat(ninputprop, ninputprop), u(ninputprop, ninputprop), vh(ninputprop, ninputprop);
+    RealMatrix rval(nrval, 1);
+    sys.reflectionMatrix(rmat);
+    svd(rmat, rval, u, vh);
+    for (int i = 0; i < nrval; i++) {
+        rval(i, 0) = rval(i, 0)*rval(i, 0);  // Convert singular values of "t" to reflection eigenvalues.
+    }
+    rval.transpose().print("Reflection eigenvalues");
+    std::cout << TAG_INFO << "Mean reflection, Ravg = " << rval.mean() << "\n";
+    sys.plotTransmissionStates(nrval);
+    
+    return 0;
+}
+
 /**
  * Main function of the test.
  */
 int main(int argc, char** argv) {
     
     //testHamiltonian();
-    testUnitarity();
+    //testUnitarity();
+    testReflectiveBarrier();
     
     return 0;
 }

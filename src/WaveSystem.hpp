@@ -88,6 +88,7 @@ class WaveSystem {
     
     // Public computational methods:
     void setDisorder(const uint64_t seed);
+    void addPotential(const int x, const int y, const dcomplex uh2);
     void transmissionMatrix(ComplexMatrix& tmat);
     void reflectionMatrix(ComplexMatrix& rmat);
     void SBlockMatrix(const std::vector<int>& index, ComplexMatrix& smat);

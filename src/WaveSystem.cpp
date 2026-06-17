@@ -665,6 +665,19 @@ void WaveSystem::setDisorder(const uint64_t seed) {
 }
 
 /**
+ * Add the potential U(x,y)*h^2 to the current Hamiltonian at the given position (x,y) on the mesh. 
+ */
+void WaveSystem::addPotential(const int x, const int y, const dcomplex uh2) {
+    
+    computed = false;  // Each time the Hamiltonian is modified, the Green function is no more valid and must be computed again.
+    const int i = mesh.indexOf(x, y);  // Compute the index of the given point.
+    
+    if (i >= 0) {// If the point is in the mesh.
+        hamiltonian(i, i) -= uh2;  // Add the diagonal element of the Hamiltonian H(i, i) = -4 + (k*h)^2 - U*h^2.
+    }
+}
+
+/**
  * Computes and return the number of input propagating modes.
  */
 int WaveSystem::computeNInputProp() const {
