@@ -20,6 +20,7 @@ class CavityBare : public Cavity {
     double width;    // With of the cavity (in meters). Default=0.252 m.
     int nscat;       // Number of scatterers. Typically: 10, 20, 50, 100.
     double rscat;    // Radius of the metallic scatterers (in meters). Default=0.0031 m. Zero gives single-pixel scatterers.
+    double dscat;    // Scsattering depth, L/l_scat, of the continuous disorder. Zero to disable.
     double freqabso; // Absorption frequency (in Hz). Default=1.5e6 Hz.
     double h;        // Size of the step used in the space discretization (in meters). Default=5.0e-4 m.
     
@@ -32,7 +33,7 @@ class CavityBare : public Cavity {
     public:
     
     // Constructor:
-    CavityBare(const CavityParameters& param, const double length, const double width, const int nscat, const double rscat, const double freqabso, const double h);
+    CavityBare(const CavityParameters& param, const double length, const double width, const int nscat, const double rscat, const double dscat, const double freqabso, const double h);
     
     // Methods shared by any cavity:
     std::vector<std::string> summary() const;

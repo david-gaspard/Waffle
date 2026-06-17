@@ -1081,7 +1081,8 @@ int main(int argc, char** argv) {
     //SquareMesh mesh("model/small-complex-test-1_102x102.png");
     //SquareMesh mesh("model/maze-abso-calib_1410x128.png"); // dscat=4 -> dscat_obs=5, holscat=dscat/1410.
     //SquareMesh mesh("model/maze-abso-10_1410x1025.png"); // dscat=4 -> dscat_obs=5, holscat=dscat/1410, nthread=3.
-    SquareMesh mesh("model/maze-abso-3_1410x1025.png");  // dscat=4 -> dscat_obs=5, holscat=dscat/1410, nthread=3.
+    //SquareMesh mesh("model/maze-abso-3_1410x1025.png");  // dscat=4 -> dscat_obs=5, holscat=dscat/1410, nthread=3.
+    SquareMesh mesh("model/constriction-simple-2_1002x500.png");  // dscat=4 -> dscat_obs=5, holscat=dscat/1410, nthread=3.
     
     
     /**
@@ -1143,23 +1144,23 @@ int main(int argc, char** argv) {
      * 16.27    20
      * 12.53    15
      */
-    const double dscat = 4.;  // Scattering depth, L/lscat.
+    const double dscat = 0.01;  // Scattering depth, L/lscat.
     const double dabso = 0.;   // Absorption depth, L/labso.
     
     const double kh = 1.;  // Wavenumber times the lattice step. Avoid kh=1 because creates resonances when ninput = 3*integer + 2.
-    const double holscat = dscat/1410; // Value of h/lscat.
-    const double holabso = dabso/1410; // Value of h/labso.
+    const double holscat = dscat/500; // Value of h/lscat.
+    const double holabso = dabso/500; // Value of h/labso.
     const double density = 1.;  // Density of scatterers per pixel, between 0 and 1. Recommended is 1.
     
-    const std::string sysname = "maze-abso-3_1410x1025/kh_" + to_string_prec(kh, 6) + "/dscat_" + to_string_prec(dscat, 6) + "/dabso_" + to_string_prec(dabso, 6);
+    const std::string sysname = "constriction-simple-2_1002x500/kh_" + to_string_prec(kh, 6) + "/dscat_" + to_string_prec(dscat, 6) + "/dabso_" + to_string_prec(dabso, 6);
     
     WaveSystem sys(sysname, mesh, kh, density, holscat, holabso);
     
-    //RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    //trange(0, 0) = 0.998;  trange(0, 1) = 0.002;
-    //trange(1, 0) = 0.500;  trange(1, 1) = 0.01;
-    //trange(2, 0) = 0.100;  trange(2, 1) = 0.005;
-    //trange(3, 0) = 0.001;  trange(3, 1) = 0.00005;
+    RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
+    trange(0, 0) = 0.998;  trange(0, 1) = 0.002;
+    trange(1, 0) = 0.500;  trange(1, 1) = 0.01;
+    trange(2, 0) = 0.100;  trange(2, 1) = 0.005;
+    trange(3, 0) = 0.001;  trange(3, 1) = 0.00005;
     
     //RealMatrix trange(6, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
     //trange(0, 0) = 0.98;  trange(0, 1) = 0.02;
@@ -1168,10 +1169,6 @@ int main(int argc, char** argv) {
     //trange(3, 0) = 0.80;  trange(3, 1) = 0.02;
     //trange(4, 0) = 0.76;  trange(4, 1) = 0.02;
     //trange(5, 0) = 0.72;  trange(5, 1) = 0.02;
-    
-    RealMatrix trange(2, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
-    trange(0, 0) = 0.98;  trange(0, 1) = 0.02;
-    trange(1, 0) = 0.90;  trange(1, 1) = 0.02;
     
     //RealMatrix trange(4, 2); // Defines the selected transmission intervals for computing the averaged profile of transmission eigenchannels:
     //trange(0, 0) = 0.53;  trange(0, 1) = 0.02;
@@ -1223,10 +1220,10 @@ int main(int argc, char** argv) {
     //ctx.sys.checkUnitarity(true); // Check the unitarity of the propagation (makes sense only for no absorption).
     
     
-    const int nseed = 250;   // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
+    const int nseed = 50;    // Number of random realizations of the disorder used for averaging. Recommended for high quality: 10^4.
     const int seed0 = 1;     // First seed used to generate realizations of the disorder. Actual seed = [seed0, seed0 + 1, ..., seed0 + nseed - 1]. 
                              // NB: Avoid seed0=0 for safety (some random generators are singular for seed=0).
-    const int nthread = 3;   // Number of threads used in multithreading with OpenMP.
+    const int nthread = 10;  // Number of threads used in multithreading with OpenMP.
     const int imode = 0;     // Index of the mode in taskIMode*() and taskIAllOMP().
     
     //taskCheckUnitarityOMP(ctx.sys, nseed, seed0, nthread);

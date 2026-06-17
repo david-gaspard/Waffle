@@ -11,12 +11,13 @@
 /**
  * Constructor of the bare cavity object.
  */
-CavityBare::CavityBare(const CavityParameters& param, const double length, const double width, const int nscat, const double rscat, const double freqabso, const double h) :
+CavityBare::CavityBare(const CavityParameters& param, const double length, const double width, const int nscat, const double rscat, const double dscat, const double freqabso, const double h) :
         Cavity(param),
         length(length),
         width(width),
         nscat(nscat),
         rscat(rscat),
+        dscat(dscat),
         freqabso(freqabso),
         h(h)
     {
@@ -68,7 +69,7 @@ std::vector<std::string> CavityBare::summary() const {
             + "], kh=[" + to_string_prec(khmin, 6) + ", " + to_string_prec(khmax, 6) + "]");
     }
     smr.push_back("Disorder: Nscat=" + std::to_string(nscat) + ", Rscat=" + to_string_prec(rscat, 6) + "m, Rscat/h=" + to_string_prec(rscatoh, 6) 
-        + " " + (rscatoh <= 0.71 ? "(point)": "(disk)")
+        + " " + (rscatoh <= 0.71 ? "(point)": "(disk)") + (dscat != 0. ? ", additional continuous disorder: L/lscat=" + to_string_prec(dscat, 6) : "")
         + ", Nseed=" + std::to_string(getNSeed()) + ", Seed0=" + std::to_string(getSeed(0)));
     return smr;
 }
@@ -99,11 +100,13 @@ WaveSystem CavityBare::generateSystem(const uint64_t seed, const double freq) co
     
     // 3. Build the wave system (including the Hamiltonian):
     const double kh = 2.*PI*freq*h/C0;  // Compute the wavenumber times the mesh step from the fact that: nprop = 2*freq*width/c0 = k*width/pi = kh*ny/pi.
-    const double holscat = 0.; // Scattering strength. This value is unused since setDisorder() is never called.
+    const double holscat = dscat/nx; // Scattering strength.
     const double density = 1.; // Density of the disorder (unused value).
     const double dabso = holabso * nx;  // Full absorption thickness, L/l_abso.
     const std::string sysname = "cavity-bare_" + std::to_string(nx) + "x" + std::to_string(ny)
         + "/nscat_" + std::to_string(nscat) + "/rscatoh_" + to_string_prec(rscatoh, 6) + "/dabso_" + to_string_prec(dabso, 6);
     
-    return WaveSystem(sysname, mesh, kh, density, holscat, holabso);
+    WaveSystem sys(sysname, mesh, kh, density, holscat, holabso);
+    sys.setDisorder(seed); // Add a continuous disorder background.
+    return sys;
 }
