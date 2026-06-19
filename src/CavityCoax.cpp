@@ -12,15 +12,18 @@
  * Constructor of the bare cavity object.
  */
 CavityCoax::CavityCoax(const CavityParameters& param, const double length, const double width, 
-            const int ncoaxin, const double apercoaxin, const int ncoaxout, const double apercoaxout,
+            const int ncoaxin,  const double apercoaxin,  const double reflcoaxin, 
+            const int ncoaxout, const double apercoaxout, const double reflcoaxout, 
             const int nscat, const double rscat, const double freqabso, const double h) :
         Cavity(param),
         length(length),
         width(width),
         ncoaxin(ncoaxin),
         apercoaxin(apercoaxin),
+        reflcoaxin(reflcoaxin),
         ncoaxout(ncoaxout),
         apercoaxout(apercoaxout),
+        reflcoaxout(reflcoaxout),
         nscat(nscat),
         rscat(rscat),
         freqabso(freqabso),
@@ -47,6 +50,9 @@ CavityCoax::CavityCoax(const CavityParameters& param, const double length, const
                         + ", expected in [" + to_string_prec(h/width, 6) + ", " + to_string_prec(1./ncoaxout, 6) + "].";
         throw std::invalid_argument(msg);
     }
+    else if (reflcoaxin < 0. || reflcoaxin > 1. || reflcoaxout < 0. || reflcoaxout > 1.) {
+        throw std::invalid_argument("In CavityCoax(): Invalid reflection probability, expected in [0, 1].");
+    }
     else if (nscat < 0) {
         throw std::invalid_argument("In CavityCoax(): Invalid number of scatterers, cannot be negative.");
     }
@@ -72,9 +78,10 @@ std::vector<std::string> CavityCoax::summary() const {
     smr.push_back("CavityCoax: Microwave rectangular cavity connected to coaxial cables and filled with metallic cylinders.");
     smr.push_back("Geometry: L=" + to_string_prec(length, 6) + "m, W=" + to_string_prec(width, 6) + "m, h=" + to_string_prec(h, 6) 
         + "m, Nx=" + std::to_string(nx) + ", Ny=" + std::to_string(ny));
-    smr.push_back(
-        "Coaxes: Ncoaxin=" + std::to_string(ncoaxin) + ", Apercoaxin=" + to_string_prec(apercoaxin, 6) + ", Wcoaxin=" + std::to_string(wcoaxin) + "px"
-        + ", Ncoaxout=" + std::to_string(ncoaxout) + ", Apercoaxout=" + to_string_prec(apercoaxout, 6) + ", Wcoaxout=" + std::to_string(wcoaxout) + "px");
+    smr.push_back("Input coaxes: Ncoaxin=" + std::to_string(ncoaxin) + ", Apercoaxin=" + to_string_prec(apercoaxin, 6) 
+        + ", Wcoaxin=" + std::to_string(wcoaxin) + "px, Reflcoaxin=" + to_string_prec(reflcoaxin, 6));
+    smr.push_back("Output coaxes: Ncoaxout=" + std::to_string(ncoaxout) + ", Apercoaxout=" + to_string_prec(apercoaxout, 6) 
+        + ", Wcoaxout=" + std::to_string(wcoaxout) + "px, Reflcoaxout=" + to_string_prec(reflcoaxout, 6));
     smr.push_back(
         "Absorption: Fabso=" + to_string_prec(freqabso, 6) + "Hz, h/labso=" + to_string_prec(holabso, 6) + ", L/labso=" + to_string_prec(nx*holabso, 6));
     
@@ -161,5 +168,18 @@ WaveSystem CavityCoax::generateSystem(const uint64_t seed, const double freq) co
         + ( wcoaxin == wcoaxout ? "/wcoax_" + std::to_string(wcoaxin) : "wcoax_in_" + std::to_string(wcoaxin) + "_out_"+ std::to_string(wcoaxout) )
         + "/nscat_" + std::to_string(nscat) + "/rscatoh_" + to_string_prec(rscatoh, 6) + "/dabso_" + to_string_prec(dabso, 6);
     
-    return WaveSystem(sysname, mesh, kh, density, holscat, holabso);
+    WaveSystem sys(sysname, mesh, kh, density, holscat, holabso);
+    
+    // 5. Add reflective barrier in front of coaxes:
+    const double d2pkh2_in = laplacianEigenvalue(0, wcoaxin) + kh*kh;  // Eigenvalue of D_y^2 + (kh)^2 for the fundamental mode of the input coax.
+    const dcomplex uh2_in = 2. * std::sqrt( (reflcoaxin/(1.-reflcoaxin)) * d2pkh2_in * ( 1. - d2pkh2_in/4. ) );  // Value U(x)*h^2 of the input potential barrier.
+    const double d2pkh2_out = laplacianEigenvalue(0, wcoaxout) + kh*kh;  // Eigenvalue of D_y^2 + (kh)^2 for the fundamental mode of the output coax.
+    const dcomplex uh2_out = 2. * std::sqrt( (reflcoaxout/(1.-reflcoaxout)) * d2pkh2_out * ( 1. - d2pkh2_out/4. ) );  // Value U(x)*h^2 of the output otential barrier.
+    
+    for (int y = 1; y <= ny; y++) {// Loop on the points to add to the potential barrier.
+        sys.addPotential(1, y, uh2_in);
+        sys.addPotential(nx, y, uh2_out);
+    }
+    
+    return sys;
 }

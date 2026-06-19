@@ -11,7 +11,7 @@
 #include <iomanip>
 
 /**
- * Test the cavity for a given realization of the disorder (seed) and a given number of proapgating modes (nprop).
+ * Test the cavity for a given realization of the disorder (seed) and a given number of propagating modes (nprop).
  */
 void testCavity(const Cavity& cavity) {
     
@@ -27,12 +27,9 @@ void testCavity(const Cavity& cavity) {
     //sys.plotMatrixOutputState(); // Plot the output state matrix as a raster image.
     //sys.plotGreenFunction(); // Plot all the modal components of the Green function.
     //sys.plotInputModes(3); // Plot the lowest waveguide modes.
-    //sys.plotTransmissionStates(22); // Plot the lowest transmission eigenstates.
+    //sys.plotTransmissionStates(8); // Plot the lowest transmission eigenstates.
     //sys.checkResidual(); // Check the residual of the solver.
     //sys.checkUnitarity(true); // Check the unitarity of the propagation (makes sense only for no absorption).
-    
-    //cavity.generateSystem(2, freq).plotTransmissionStates(22);
-    //cavity.generateSystem(3, freq).plotTransmissionStates(22);
     
 }
 
@@ -133,16 +130,16 @@ int main(int argc, char** argv) {
     // Parameters:
     const double length      = 0.400;       // Length of the cavity (in meters). Default=0.400 m.
     const double width       = 0.252;       // With of the cavity (in meters). Default=0.252 m.
-    const int nscat          = 0;           // Number of scatterers. Typically: 10, 20, 50, 100, and so on.
-    const double rscat       = 0.;          // Radius of the metallic scatterers (in meters). Default=0.0031 m. Zero gives single-pixel scatterers.
-    const double dscat       = 0.;          // Scattering depth, L/l_scat, of continuous Dirac-delta disorder (if present). Zero to disable.
-    const double freqabso    = 0.;          // Absorption frequency (in Hz). Default=1.5e6 Hz for rscat=3.1e-3, and 7.0e6 Hz for rscat=1e-3.
+    const int nscat          = 10;          // Number of scatterers. Typically: 10, 20, 50, 100, and so on.
+    const double rscat       = 3.1e-3;      // Radius of the metallic scatterers (in meters). Default=0.0031 m. Zero gives single-pixel scatterers.
+    const double dscat       = 0.;          // Scattering depth, L/l_scat, of additional continuous Dirac-delta disorder (if present). Zero to disable.
+    const double freqabso    = 1.5e6;       // Absorption frequency (in Hz). Default=1.5e6 Hz for rscat=3.1e-3, and 7.0e6 Hz for rscat=1e-3.
     
     const int ncoaxin        = 8;           // Number of input coaxes.
     const double apercoaxin  = 1./15;       // Aperture of input coaxes (in fraction of the width). Typically, 1/15 when ncoaxin=8, and 3/8 when coaxin=1.
     //const int ncoaxin        = 1;           // Number of input coaxes.
     //const double apercoaxin  = 3./8;        // Aperture of input coaxes (in fraction of the width). Typically, 1/15 when ncoaxin=8, and 3/8 when coaxin=1.
-    const double reflcoaxin  = 0.04;        // Reflection probability of the input coax barrier.
+    const double reflcoaxin  = 0.10;        // Reflection probability of the input coax barrier.
     
     const int ncoaxout       = ncoaxin;     // Number of output coax cables.
     const double apercoaxout = apercoaxin;  // Aperture of output coax cables (in fraction of the width).
@@ -152,21 +149,21 @@ int main(int argc, char** argv) {
     const int nthread        = 10;          // Number of independent computation threads used in the parallelization.
     
     const CavityParameters param = {
-        .nseed = 20,         // Number of realizations of the disorder.
-        .nfreq = 1,          // Number of frequencies in the frequency range. Nfreq=1 selects the center of the interval.
-        .freqmin = 12.0e9,   // Minimum field frequency of the frequency range (in Hz). Default=12.0e9 Hz.
-        .freqmax = 15.0e9    // Minimum field frequency of the frequency range (in Hz). Default=15.0e9 Hz.
+        .nseed = 50,        // Number of realizations of the disorder.
+        .nfreq = 20,        // Number of frequencies in the frequency range. Nfreq=1 selects the center of the interval.
+        .freqmin = 12.0e9,  // Minimum field frequency of the frequency range (in Hz). Default=12.0e9 Hz.
+        .freqmax = 15.0e9   // Minimum field frequency of the frequency range (in Hz). Default=15.0e9 Hz.
     };
     
     //CavityBare cavity(param, length, width, nscat, rscat, dscat, freqabso, h); // Create a bare cavity with circular scatterers.
-    //CavityCoax cavity(param, length, width, ncoaxin, apercoaxin, reflcoaxin, ncoaxout, apercoaxout, reflcoaxout, nscat, rscat, freqabso, h); // Create a cavity with coax guides.
+    CavityCoax cavity(param, length, width, ncoaxin, apercoaxin, reflcoaxin, ncoaxout, apercoaxout, reflcoaxout, nscat, rscat, freqabso, h); // Create a cavity with coax guides.
     
     cavity.printSummary(); // Print the summary of the cavity parameters.
     
     testCavity(cavity);  // Test the cavity.
     
     // Compute the transmission eigenvalue spectrum:
-    //taskTSpectrum(cavity, nthread);
+    taskTSpectrum(cavity, nthread);
     
     return 0;
 }

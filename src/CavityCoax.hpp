@@ -17,10 +17,15 @@ class CavityCoax : public Cavity {
     
     double length;      // Length of the cavity (in meters). Default=0.400 m.
     double width;       // With of the cavity (in meters). Default=0.252 m.
+    
     int ncoaxin;        // Number of input coax cables.
     double apercoaxin;  // Aperture of input coax cables (in fraction of the width).
+    double reflcoaxin;  // Reflectivity of input coax cables, probability taking into account impedance mismatch (between 0 and 1).
+    
     int ncoaxout;       // Number of output coax cables.
     double apercoaxout; // Aperture of output coax cables.
+    double reflcoaxout;  // Reflectivity of output coax cables, probability taking into account impedance mismatch (between 0 and 1).
+    
     int nscat;          // Number of scatterers. Typically: 10, 20, 50, 100.
     double rscat;       // Radius of the metallic scatterers (in meters). Default=0.0031 m. Zero gives single-pixel scatterers.
     double freqabso;    // Absorption frequency (in Hz). Default=1.5e6 Hz.
@@ -38,7 +43,8 @@ class CavityCoax : public Cavity {
     
     // Constructor:
     CavityCoax(const CavityParameters& param, const double length, const double width, 
-            const int ncoaxin, const double apercoaxin, const int ncoaxout, const double apercoaxout,
+            const int ncoaxin,  const double apercoaxin,  const double reflcoaxin, 
+            const int ncoaxout, const double apercoaxout, const double reflcoaxout, 
             const int nscat, const double rscat, const double freqabso, const double h);
     
     // Methods shared by any cavity:
