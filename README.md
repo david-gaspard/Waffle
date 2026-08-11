@@ -2,6 +2,7 @@
 
 [![C++](https://img.shields.io/badge/C++-%2300599C.svg?logo=c%2B%2B&logoColor=white)](https://cplusplus.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-red.svg)](https://opensource.org/licenses/MIT)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21892130.svg)](https://doi.org/10.5281/zenodo.21892130)
 
 * [PRESENTATION](#presentation)
     - [Wave equation and transmission eigenstates](#wave-equation-and-transmission-eigenstates)
@@ -121,15 +122,15 @@ where `model/image.png` can be replaced by the file path of any image in the [`m
 This model image completely defines the mesh structure and uses the following color code:
 
 * White (`#FFFFFF`): The pixel is void and should be skipped from the mesh.
-* Black (`#000000`): The pixel is added to the mesh. The default boudary condition between black and white pixels are Dirichlet boundary conditions $\psi(\mathbf{r})=0$.
+* Black (`#000000`): The pixel is added to the mesh. The default boundary condition between black and white pixels are Dirichlet boundary conditions $\psi(\mathbf{r})=0$.
 * Red (`#FF0000`): Black pixels surrounding a red pixel are flagged as belonging to an input duct for the construction of the transmission matrix.
   Red pixels are not added to the mesh.
 * Blue (`#0000FF`): Black pixels surrounding a blue pixel are flagged as belonging to an output duct for the construction of the transmission matrix. 
   Blue pixels are not added to the mesh.
-* Green (`#00FF00`): Black pixels surrouding a green pixels are flagged as belonging to a duct which is neither input nor output and thus ignored from the transmission matrix.
+* Green (`#00FF00`): Black pixels surrounding a green pixels are flagged as belonging to a duct which is neither input nor output and thus ignored from the transmission matrix.
   Green pixels are not added to the mesh.
 
-Note that red (`#FF0000`), blue (`#0000FF`), and green (`#00FF00`) pixels assume free-esacpe boundary conditions presented before.
+Note that red (`#FF0000`), blue (`#0000FF`), and green (`#00FF00`) pixels assume free-escape boundary conditions presented before.
 It is worth noting that `SquareMesh` objects can also be generated procedurally using the methods found in the file [`src/SquareMesh.hpp`](src/SquareMesh.hpp).
 This can be helpful if the boundaries are complicated or change randomly from one simulation to the other.
 
@@ -182,7 +183,7 @@ sys.addITransmission(trange, tprofile, nsample, tval);
 ```
 where
 
-* `trange` is an input matrix with two columns, the first column defined the center of intervals over which the transmission igenstates are desired, and the second column are the half width of intervals. The number of rows of this matrix determines the number of transmission eigenstates profiles.
+* `trange` is an input matrix with two columns, the first column defined the center of intervals over which the transmission eigenstates are desired, and the second column are the half width of intervals. The number of rows of this matrix determines the number of transmission eigenstates profiles.
 * `tprofile` is a matrix containing, on output, the intensity profile of transmission eigenstates, one per column. 
 If multiple eigenvalues are found in the same interval, then they are summed up (not averaged).
 The method adds the profiles directly to `tprofile`, so this matrix must be initialized to zero.
@@ -191,7 +192,7 @@ This matrix must have as many rows as `trange`, and one column.
 The method increments the number of found transmission eigenvalues in `nsample`, so this matrix must be initialized to zero.
 * `tval` is a column matrix containing, on output, all the transmission eigenvalues (should they belong to the intervals of `trange` or not).
 
-The full list of methods can be found in the header file [`src/WaveSystem.hpp`](src/WaveSystem.hpp) and in the [`src/WaveSystem.cpp`](src/WaveSystem.cpp) file.
+The full list of methods can be found in the header file [`src/WaveSystem.hpp`](src/WaveSystem.hpp) and in the implementation file [`src/WaveSystem.cpp`](src/WaveSystem.cpp).
 
 ## REFERENCES
 
