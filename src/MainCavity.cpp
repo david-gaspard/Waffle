@@ -15,10 +15,7 @@
  */
 void testCavity(const Cavity& cavity) {
     
-    const uint64_t seed = 1; // Seed used for disorder generation.
-    const double freq = 13.5e9; // Default frequency (Hz).
-    
-    WaveSystem sys = cavity.generateSystem(seed, freq);
+    WaveSystem sys = cavity.generateSystem(cavity.getSeed(0), cavity.getMeanFreq());
     
     sys.printSummary(); // Print the summary of the wave system.
     //sys.plotMesh(); // Plot the mesh.
@@ -128,27 +125,25 @@ int main(int argc, char** argv) {
     std::cout << "****** This is " << PROGRAM_COPYRIGHT << " ******\n";
     
     // Parameters:
-    const double length      = 0.400;       // Length of the cavity (in meters). Default=0.400 m.
-    const double width       = 0.252;       // With of the cavity (in meters). Default=0.252 m.
-    const int nscat          = 10;          // Number of scatterers. Typically: 10, 20, 50, 100, and so on.
-    const double rscat       = 3.1e-3;      // Radius of the metallic scatterers (in meters). Default=0.0031 m. Zero gives single-pixel scatterers.
-    const double dscat       = 0.;          // Scattering depth, L/l_scat, of additional continuous Dirac-delta disorder (if present). Zero to disable.
-    const double freqabso    = 1.5e6;       // Absorption frequency (in Hz). Default=1.5e6 Hz for rscat=3.1e-3, and 7.0e6 Hz for rscat=1e-3.
+    double length      = 0.400;       // Length of the cavity (in meters). Default=0.400 m.
+    double width       = 0.252;       // With of the cavity (in meters). Default=0.252 m.
+    int nscat          = 100;         // Number of scatterers. Typically: 10, 20, 50, 100, and so on.
+    double rscat       = 3.1e-3;      // Radius of the metallic scatterers (in meters). Default=0.0031 m. Zero gives single-pixel scatterers.
+    double dscat       = 0.;          // Scattering depth, L/l_scat, of additional continuous Dirac-delta disorder (if present). Zero to disable.
+    double freqabso    = 1.5e6;       // Absorption frequency (in Hz). Default=1.5e6 Hz for rscat=3.1e-3, and 4.0e6 Hz for rscat=1e-3.
     
-    const int ncoaxin        = 8;           // Number of input coaxes.
-    const double apercoaxin  = 1./15;       // Aperture of input coaxes (in fraction of the width). Typically, 1/15 when ncoaxin=8, and 3/8 when coaxin=1.
-    //const int ncoaxin        = 1;           // Number of input coaxes.
-    //const double apercoaxin  = 3./8;        // Aperture of input coaxes (in fraction of the width). Typically, 1/15 when ncoaxin=8, and 3/8 when coaxin=1.
-    const double reflcoaxin  = 0.10;        // Reflection probability of the input coax barrier.
+    int ncoaxin        = 8;           // Number of input coaxes.
+    double apercoaxin  = 1./15;       // Aperture of input coaxes (in fraction of the width). Typically, 1/15 when ncoaxin=8, and 3/8 when ncoaxin=1.
+    double reflcoaxin  = 0.1;        // Reflection probability of the input coax barrier. Typically, 0.1.
     
-    const int ncoaxout       = ncoaxin;     // Number of output coax cables.
-    const double apercoaxout = apercoaxin;  // Aperture of output coax cables (in fraction of the width).
-    const double reflcoaxout = reflcoaxin;  // Reflection probability of the output coax barrier.
+    int ncoaxout       = ncoaxin;     // Number of output coax cables.
+    double apercoaxout = apercoaxin;  // Aperture of output coax cables (in fraction of the width).
+    double reflcoaxout = reflcoaxin;  // Reflection probability of the output coax barrier.
     
-    const double h           = 5.e-4;       // Size of the step used in the space discretization (in meters). Default=5.0e-4 m.
-    const int nthread        = 10;          // Number of independent computation threads used in the parallelization.
+    double h           = 5.e-4;       // Size of the step used in the space discretization (in meters). Default=5.0e-4 m.
+    int nthread        = 10;          // Number of independent computation threads used in the parallelization.
     
-    const CavityParameters param = {
+    CavityParameters param = {
         .nseed = 50,        // Number of realizations of the disorder.
         .nfreq = 20,        // Number of frequencies in the frequency range. Nfreq=1 selects the center of the interval.
         .freqmin = 12.0e9,  // Minimum field frequency of the frequency range (in Hz). Default=12.0e9 Hz.
@@ -164,6 +159,40 @@ int main(int argc, char** argv) {
     
     // Compute the transmission eigenvalue spectrum:
     taskTSpectrum(cavity, nthread);
+    
+    /**
+     * // Automated simulations :
+     * 
+     * std::vector<int> nscat_list = {50, 200, 300, 500};
+     * 
+     * ncoaxin = 8;
+     * apercoaxin = 1./15;
+     * ncoaxout    = ncoaxin;
+     * apercoaxout = apercoaxin;
+     * 
+     * param.freqmin = 12.e9;
+     * param.freqmax = 15.e9;
+     * 
+     * for (int nscat : nscat_list) {// Loop on number of scatterers:
+     *     CavityCoax cavity(param, length, width, ncoaxin, apercoaxin, reflcoaxin, ncoaxout, apercoaxout, reflcoaxout, nscat, rscat, freqabso, h);
+     *     cavity.printSummary(); // Print the summary of the cavity parameters.
+     *     taskTSpectrum(cavity, nthread);
+     * }
+     * 
+     * ncoaxin = 1;
+     * apercoaxin = 3./8;
+     * ncoaxout    = ncoaxin;
+     * apercoaxout = apercoaxin;
+     * 
+     * param.freqmin = 13.e9;
+     * param.freqmax = 14.e9;
+     * 
+     * for (int nscat : nscat_list) {// Loop on number of scatterers:
+     *     CavityCoax cavity(param, length, width, ncoaxin, apercoaxin, reflcoaxin, ncoaxout, apercoaxout, reflcoaxout, nscat, rscat, freqabso, h);
+     *     cavity.printSummary(); // Print the summary of the cavity parameters.
+     *     taskTSpectrum(cavity, nthread);
+     * }
+     **/
     
     return 0;
 }

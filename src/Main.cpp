@@ -9,67 +9,6 @@
 #include <iomanip>
 
 /**
- * @todo TODO LIST:
- * DONE: (1)  In WaveSystem: If possible, compute the exact expression of the free DOS on a square lattice. It is used in setDisorder()...
- * DONE: (2)  In Waffle/Usador: Make the figures for Arthur (see below)...
- * DONE: (3)  In plot_map.py: Fix the partial read bug with the CSV reader which occurs when it is called by the C++ program...
- * DONE: (4)  In WaveSystem: Check in doing math that the normalization of transmission eigenstates is correct.
- * DONE: (5)  Calculate the condition number of the "hamiltonian" for a waveguide by estimating the lowest eigenstate. 
- *            This would indicate whether using iterative methods (instead of direct solvers) is relevant or not...
- * DONE: (6)  In SparseComplexMatrix: Try to optimize the construction of the Hamiltonian.
- *            Check if there is a faster object than "vector" for insertion:
- *            - See "map" (binary tree): faster for insertion than "vector" (no realloc), faster for accessing by key, slower for traversal (no direct linkage).
- *              Probably most appropriate choice if and only if traversal is not too slow compared to "vector".
- *            - See "forward_list" (linked list): faster for insertion than vector (no realloc), faster for traversal, slower for accessing by key 
- *              (no binary search). Both objects should be tested for speed in construction and in conversion for UMFPack.
- * DONE: (7)  Note that if binary trees are indeed faster for sorted insertion/deletion, then "set" would be more appropriate for the points in SquareMesh...
- * DONE: (8)  In Main: Add histogram of transmission eigenvalues. Simply save all raw eigenvalues in a CSV file (each row per disorder realization)...
- * DONE: (9)  Write "plot_histo.py" to plot the histogram of a list of values in given interval [Tmin, Tmax] using Nbins.
- * DONE: (10) In all plot scripts: Extract the header of the CSV file and copy it into the "title" of pgfplots' "axis" environment.
- * DONE: (11) In WaveSystem: Add checkResidual() to verify that the linear system is correctly solved...
- * DONE: (12) In WaveSystem: Maybe remove the evanescent modes from "inputState" and "outputState" because they always give zero transmission eigenvalues...
- * DONE: (13) In SparseComplexMatrix: Implement solveMumps() (no iterative refinement) and compare performance with solveUmfpack()...
- * DONE: (14) Arthur 2025-09-04: Implement the average intensity Ibar(r) without wavefront shaping...
- * DONE: (15) Create script "plot_cut.py" to plot the intensity profile along a cut. A straight line should do the job...
- * DONE: (16) In SparseComplexMatrix: Improve plotImage() to export directly a PNG image instead of a heavy PPM file.
- * DONE: (17) In SquareMesh: Create addImage(filename) to import PNG in order to facilitate the mesh creation...
- * DONE: (18) Arthur 2025-09-04: For the paper, come back with the double waveguide case (with/without absorber), and compute the eigenstate profile
- *       and the transmission eigenvalue distribution. Test changing the numerical aperture of each of the guides...
- * DONE: (19) In Main: Possibly add parallelized taskTransmissionOMP(). Maybe MPI is more relevant, given the memory size of reference 1 Mpx simulations...
- * DONE: (20) Modify plot_histo.py, plot_cut.py, plot_proj.py to output CSV files instead of writing data directly into TikZ files.
- *            This will allow the simulations parameters in headers to be preserved as locally as possible.
- * DONE: (21) Arthur 2025-09-11: Implement average intensity for a plane wave input in order to show the comparison in the paper.
- *            In the code, make clear the distinction between Lambertian input and plane wave input.
- * DONE: (22) In Usador: Add computation time, especially for the computation of the Q field at specific T.
- * ----------------------------------------------------------------------
- * TODO (2025-09-25): 
- * The normalization problem of 2025-09-24 is now considered as solved.
- * However, some safety measures and revision should be done to avoid encountering this problem again:
- * (1) Create a safety system to avoid that the input waveguide resonates :
- *      kh_fix = 2*sin( pi/(2*(Ny+1)) * ( floor( (2*(Ny + 1))/pi * arcsin(kh/2) ) + 0.3 ) );
- * This should give approximately: dosinput = dosfree.
- * (2) Remove estimate of dscat_exact (with accurate extrapolation length because Usador does not use this value (this can create confusion).
- * (3) Improve estimate of dscat_approx (with approximation extrapolation length) with the computation of statistical uncertainties (as in RecurGreen).
- * ----------------------------------------------------------------------
- * (23) Perform benchmark simulations (+ comparison with Usadel) for :
- *      (A) Square waveguide 500x500, 
- *      (B) Slab transmission 300x900, equal size input and output,
- *      (C) Slab transmission 300x900, large input, small output,
- *      (D) Slab remission 300x900, 
- *      (E) Another geometry, maybe the double waveguide, the maze, the "random fiber", or simply the random cavity (to be discussed)...
- * 
- * (24) Arthur 2025-09-17: Consider the trinity of waveguides with absorbers: Tmax, Rmin, Abso_max (=Smin).
- *      To this end, we need (1) to create the "inout" boundary condition, (2) to implement local absorption. And do the same in Usador.
- * (25) Do no forget to implement the absorption (holabso != 0) using complex wavenumbers.
- *      Check that the implementation is correct, maybe using the Green function, or the distribution rho(T) (which should match RecurGreen's results)...
- * (26) Arthur 2025-09-04: What happens if we add a non-scattering region in the center of the waveguide ?
- *      We would have D(r) -> infty... What happens in the Usadel equation ?
- *      It would be funny to find a system with transmission eigenstate "opposite" to the average intensity (without shaping). 
- *      Such that maximum of the eigenstate corresponds to the minimum of the average intensity...
- * (27) Arthur 2025-09-04: For the paper, come back on the geometrical interpretation of the Q space and the (theta,eta) parametrization...
- */
-
-/**
  * Defines the overall simulation context.
  */
 struct Context {
@@ -1018,7 +957,7 @@ int main(int argc, char** argv) {
     
     // Create the system from a PNG image:
     //SquareMesh mesh("model/waveguide_30x20.png");
-    //SquareMesh mesh("model/waveguide_302x300.png"); // Currently standard waveguide.
+    SquareMesh mesh("model/waveguide_302x300.png"); // Currently standard waveguide.
     //SquareMesh mesh("model/waveguide_602x600.png");
     //SquareMesh mesh("model/waveguide_1202x1200.png");
     //SquareMesh mesh("model/double-guide-abso-sym_642x384.png");
@@ -1082,7 +1021,7 @@ int main(int argc, char** argv) {
     //SquareMesh mesh("model/maze-abso-calib_1410x128.png"); // dscat=4 -> dscat_obs=5, holscat=dscat/1410.
     //SquareMesh mesh("model/maze-abso-10_1410x1025.png"); // dscat=4 -> dscat_obs=5, holscat=dscat/1410, nthread=3.
     //SquareMesh mesh("model/maze-abso-3_1410x1025.png");  // dscat=4 -> dscat_obs=5, holscat=dscat/1410, nthread=3.
-    SquareMesh mesh("model/constriction-simple-2_1002x500.png");  // dscat=4 -> dscat_obs=5, holscat=dscat/1410, nthread=3.
+    //SquareMesh mesh("model/constriction-simple-2_1002x500.png");  // dscat=4 -> dscat_obs=5, holscat=dscat/1410, nthread=3.
     
     
     /**
@@ -1144,15 +1083,15 @@ int main(int argc, char** argv) {
      * 16.27    20
      * 12.53    15
      */
-    const double dscat = 0.01;  // Scattering depth, L/lscat.
+    const double dscat = 5.;  // Scattering depth, L/lscat.
     const double dabso = 0.;   // Absorption depth, L/labso.
     
     const double kh = 1.;  // Wavenumber times the lattice step. Avoid kh=1 because creates resonances when ninput = 3*integer + 2.
-    const double holscat = dscat/500; // Value of h/lscat.
-    const double holabso = dabso/500; // Value of h/labso.
+    const double holscat = dscat/300; // Value of h/lscat.
+    const double holabso = dabso/300; // Value of h/labso.
     const double density = 1.;  // Density of scatterers per pixel, between 0 and 1. Recommended is 1.
     
-    const std::string sysname = "constriction-simple-2_1002x500/kh_" + to_string_prec(kh, 6) + "/dscat_" + to_string_prec(dscat, 6) + "/dabso_" + to_string_prec(dabso, 6);
+    const std::string sysname = "waveguide_302x300/kh_" + to_string_prec(kh, 6) + "/dscat_" + to_string_prec(dscat, 6) + "/dabso_" + to_string_prec(dabso, 6);
     
     WaveSystem sys(sysname, mesh, kh, density, holscat, holabso);
     
