@@ -16,7 +16,7 @@
 
 Waffle is a C++ 2017 program to solve the [stationary wave equation](https://en.wikipedia.org/wiki/Helmholtz_equation) in a two-dimensional disordered medium of arbitrary shape.
 The name is a contraction of *"Wave Field From Finite Elements"*.
-This program primarily focuses on the computation of the [transmission and reflection matrices](https://en.wikipedia.org/wiki/S-matrix) between two or more ducts, the distribution of transmission eigenvalues, and the profile of transmission eigenstates (aka transmission eigenchannels).
+This program primarily focuses on the computation of the [transmission and reflection matrices](https://en.wikipedia.org/wiki/S-matrix) between two or more ducts, the distribution of transmission eigenvalues[^1], and the profile of transmission eigenstates (aka transmission eigenchannels[^2][^3]).
 
 ### Wave equation and transmission eigenstates
 
@@ -34,7 +34,7 @@ This boundary condition formally imposes the cancellation of all incoming waves,
 
 where $\mathbf{n}$ is the outward [normal](https://en.wikipedia.org/wiki/Normal_(geometry)) to the duct's open edge.
 Note that the square root makes the operator [nonlocal](https://en.wikipedia.org/wiki/Nonlocal_operator) across all points on the duct's open edge.
-From the Green's function, we can derive the transmission and reflection matrices according to the Fisher and Lee relations [^1],
+From the Green's function, we can derive the transmission and reflection matrices according to the Fisher and Lee relations[^4],
 
 <p>$$ t_{mn} = 2\mathrm{i}\sqrt{k_{{\rm out},m} k_{{\rm in},n}} \int_{\mathcal{S}_{\rm out}} \mathrm{d}{\mathbf{y}}\, \chi_{{\rm out},m}^*(\mathbf{y}) G^+_{n}(x_{\rm out},\mathbf{y}) , $$</p>
 
@@ -92,47 +92,45 @@ It also received support from a grant of the [Simons Foundation](https://ror.org
 
 ## INSTALLATION AND USAGE
 
-The source files can be downloaded using the [`git clone`](https://git-scm.com/docs/git-clone) command:
-```shell
-git clone https://github.com/david-gaspard/Waffle.git
-```
+The source files can be downloaded using the [`git clone`](https://git-scm.com/docs/git-clone) command.
 To compile the program, call the [`make`](https://en.wikipedia.org/wiki/Make_(software)) utility in the root directory:
 ```shell
 make all
 ```
+This should generate an executable.
 
 ### Dependencies
 
-The program requires a C++ compiler, such as from the [GNU Compiler Collection](https://en.wikipedia.org/wiki/GNU_Compiler_Collection), and the libraries [OpenBLAS](https://en.wikipedia.org/wiki/OpenBLAS), [UMFPACK](https://en.wikipedia.org/wiki/UMFPACK), [MUMPS](https://en.wikipedia.org/wiki/MUMPS_(software)), and [libpng](https://en.wikipedia.org/wiki/Libpng).
+The program requires a [C++](https://en.wikipedia.org/wiki/C++) compiler, such as from the [GNU Compiler Collection](https://en.wikipedia.org/wiki/GNU_Compiler_Collection), and the libraries [OpenBLAS](https://en.wikipedia.org/wiki/OpenBLAS), [UMFPACK](https://en.wikipedia.org/wiki/UMFPACK), [MUMPS](https://en.wikipedia.org/wiki/MUMPS_(software)), and [libpng](https://en.wikipedia.org/wiki/Libpng).
 It also calls [Python 3](https://en.wikipedia.org/wiki/Python_(programming_language)) with the [NumPy](https://en.wikipedia.org/wiki/NumPy), [Matplotlib](https://en.wikipedia.org/wiki/Matplotlib), and [csv](https://docs.python.org/3/library/csv.html) modules, but also the command `pdflatex` from [TeX Live](https://en.wikipedia.org/wiki/TeX_Live) with the [PGFPlots](https://ctan.org/pkg/pgfplots) package to process graphical outputs automatically.
 
 ### Usage
 
-The recommended way to launch the program is through the `run` script:
+The recommended way to launch the program is through the [`run`](run) script:
 ```shell
 ./run
 ```
 This script defines the environment variables and calls the executable.
-The executable is built from the `src/Main.cpp` file which contains the computation instructions.
+The executable is built from the [`src/Main.cpp`](src/Main.cpp) file which contains the computation instructions in [C++](https://en.wikipedia.org/wiki/C++).
 The first step is to define the mesh over which the wave equation will be solved.
 This can be done by instantiating a `SquareMesh` object as follows
 ```cpp
 SquareMesh mesh("model/image.png");
 ```
-where `model/image.png` can be replaced by a file path to any image in the `model` folder or elsewhere on your machine.
+where `model/image.png` can be replaced by the file path of any image in the [`model/`](model) folder or elsewhere on the host machine.
 This model image completely defines the mesh structure and uses the following color code:
 
-* White (`#FFF`): The pixel is void and should be skipped from the mesh.
-* Black (`#000`): The pixel is added to the mesh. The default boudary condition between black and white pixels are Dirichlet boundary conditions $\psi(\mathbf{r})=0$.
-* Red (`#F00`): Black pixels surrounding a red pixel are flagged as belonging to an input duct for the construction of the transmission matrix.
+* White (`#FFFFFF`): The pixel is void and should be skipped from the mesh.
+* Black (`#000000`): The pixel is added to the mesh. The default boudary condition between black and white pixels are Dirichlet boundary conditions $\psi(\mathbf{r})=0$.
+* Red (`#FF0000`): Black pixels surrounding a red pixel are flagged as belonging to an input duct for the construction of the transmission matrix.
   Red pixels are not added to the mesh.
-* Blue (`#00F`): Black pixels surrounding a blue pixel are flagged as belonging to an output duct for the construction of the transmission matrix. 
+* Blue (`#0000FF`): Black pixels surrounding a blue pixel are flagged as belonging to an output duct for the construction of the transmission matrix. 
   Blue pixels are not added to the mesh.
-* Green (`#0F0`): Black pixels surrouding a green pixels are flagged as belonging to a duct which is neither input nor output and thus ignored from the transmission matrix.
+* Green (`#00FF00`): Black pixels surrouding a green pixels are flagged as belonging to a duct which is neither input nor output and thus ignored from the transmission matrix.
   Green pixels are not added to the mesh.
 
-Note that red (`#F00`), blue (`#00F`), and green (`#0F0`) pixels assume free-esacpe boundary conditions presented before.
-It is worth noting that `SquareMesh` objects can also be generated procedurally using the methods found in the file `src/SquareMesh.hpp`.
+Note that red (`#FF0000`), blue (`#0000FF`), and green (`#00FF00`) pixels assume free-esacpe boundary conditions presented before.
+It is worth noting that `SquareMesh` objects can also be generated procedurally using the methods found in the file [`src/SquareMesh.hpp`](src/SquareMesh.hpp).
 This can be helpful if the boundaries are complicated or change randomly from one simulation to the other.
 
 A `WaveSystem` object (containing the potential, the discretization of the wave equation, and the Green's function) is then instantiated by the command:
@@ -149,14 +147,14 @@ where
 * `holabso` is the ratio of the mesh step over the ballistic absorption length.
 
 The `WaveSystem` object is the main computational object of the program.
-Computations can be performed by calling the methods of `WaveSystem` (see also `src/WaveSystem.hpp`).
+Computations can be performed by calling the methods of `WaveSystem` (see also [`src/WaveSystem.hpp`](src/WaveSystem.hpp)).
 For instance, in order to setup a new random realization of the disorder, one can call
 ```cpp
 uint64_t seed = 1;
 sys.setDisorder(seed);
 ```
 where `seed` is a long integer uniquely representing the realization of the disorder.
-The transmission matrix `tmat` associated with the propagation from input ducts (red `#F00` pixels) to output ducts (blue `#00F` pixels) can then be computed using
+The transmission matrix `tmat` associated with the propagation from input ducts (red `#FF0000` pixels) to output ducts (blue `#0000FF` pixels) can then be computed using
 ```cpp
 ComplexMatrix tmat(sys.getNOutputProp(), sys.getNInputProp());
 sys.transmissionMatrix(tmat);
@@ -193,8 +191,11 @@ This matrix must have as many rows as `trange`, and one column.
 The method increments the number of found transmission eigenvalues in `nsample`, so this matrix must be initialized to zero.
 * `tval` is a column matrix containing, on output, all the transmission eigenvalues (should they belong to the intervals of `trange` or not).
 
-The full list of methods can be found in the header file `src/WaveSystem.hpp` and the documentation in the corresponding `*.cpp` file.
+The full list of methods can be found in the header file [`src/WaveSystem.hpp`](src/WaveSystem.hpp) and in the [`src/WaveSystem.cpp`](src/WaveSystem.cpp) file.
 
 ## REFERENCES
 
-[^1]: D. S. Fisher and P. A. Lee, _Relation between conductivity and transmission matrix_, [Phys. Rev. B **23**, 6851-6854 (1981)](https://doi.org/10.1103/PhysRevB.23.6851).
+[^1]: C. W. J. Beenakker, _Random-matrix theory of quantum transport_, [Rev. Mod. Phys. **69**, 731 (1997)](https://doi.org/10.1103/RevModPhys.69.731).
+[^2]: W. Choi, A. P. Mosk, Q.-H. Park, and W. Choi, _Transmission eigenchannels in a disordered medium_, [Phys. Rev. B **83**, 134207 (2011)](https://doi.org/10.1103/PhysRevB.83.134207).
+[^3]: M. Davy, Z. Shi, J. Park, C. Tian, and A. Z. Genack, _Universal structure of transmission eigenchannels inside opaque media_, [Nat. Commun. **6**, 6893 (2015)](https://doi.org/10.1038/ncomms7893).
+[^4]: D. S. Fisher and P. A. Lee, _Relation between conductivity and transmission matrix_, [Phys. Rev. B **23**, 6851-6854 (1981)](https://doi.org/10.1103/PhysRevB.23.6851).
