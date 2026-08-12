@@ -2,7 +2,7 @@
 
 [![C++](https://img.shields.io/badge/C++-%2300599C.svg?logo=c%2B%2B&logoColor=white)](https://cplusplus.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-red.svg)](https://opensource.org/licenses/MIT)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21892130.svg)](https://doi.org/10.5281/zenodo.21892130)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21900483.svg)](https://doi.org/10.5281/zenodo.21900483)
 
 * [PRESENTATION](#presentation)
     - [Wave equation and transmission eigenstates](#wave-equation-and-transmission-eigenstates)
